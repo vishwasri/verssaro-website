@@ -70,3 +70,15 @@ export function getErrorMessage(
   if (err instanceof Error && err.message) return err.message;
   return fallback;
 }
+
+export function getSafeRedirectTarget(fallback = '/account'): string {
+  if (typeof window === 'undefined') return fallback;
+  const rawRedirect = new URLSearchParams(window.location.search).get(
+    'redirect',
+  );
+  return rawRedirect &&
+    rawRedirect.startsWith('/') &&
+    !rawRedirect.startsWith('//')
+    ? rawRedirect
+    : fallback;
+}

@@ -1,18 +1,22 @@
 'use client';
 
-import React, { Suspense, useState } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { AuthField, PasswordAuthField } from '@/components/AuthFields';
 import { AuthShell } from '@/components/AuthShell';
 import { useStore } from '@/components/StoreContext';
-import { apiFetch, getErrorMessage, setAuthToken } from '@/lib/api';
+import {
+  apiFetch,
+  getErrorMessage,
+  getSafeRedirectTarget,
+  setAuthToken,
+} from '@/lib/api';
 import { UserDossier } from '@/lib/types';
 import { useAccessibleFormValidation } from '@/lib/useAccessibleFormValidation';
 
-function SignUpFormContent() {
+export default function SignUpPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { refreshDossier, announce } = useStore();
   const { formRef, validateBeforeSubmit } = useAccessibleFormValidation();
 
@@ -23,12 +27,6 @@ function SignUpFormContent() {
   const [acceptedPolicy, setAcceptedPolicy] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
-
-  const rawRedirect = searchParams.get('redirect');
-  const redirectTarget =
-    rawRedirect && rawRedirect.startsWith('/') && !rawRedirect.startsWith('//')
-      ? rawRedirect
-      : '/account';
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -65,7 +63,7 @@ function SignUpFormContent() {
       announce(
         `DOSSIER PROVISIONED: ${res.user.dossierCode || res.user.name.toUpperCase()}`,
       );
-      router.push(redirectTarget);
+      router.push(getSafeRedirectTarget());
     } catch (err: unknown) {
       setServerError(getErrorMessage(err, 'UNABLE TO CREATE PATRON DOSSIER'));
     } finally {
@@ -256,19 +254,5 @@ function SignUpFormContent() {
         </button>
       </form>
     </AuthShell>
-  );
-}
-
-export default function SignUpPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen bg-surface text-on-surface flex items-center justify-center font-data-mono text-xs uppercase tracking-widest">
-          INITIALIZING DOSSIER REGISTRATION...
-        </div>
-      }
-    >
-      <SignUpFormContent />
-    </Suspense>
   );
 }

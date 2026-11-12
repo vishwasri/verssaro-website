@@ -1,12 +1,17 @@
 'use client';
 
-import React, { Suspense, useState } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { AuthField, PasswordAuthField } from '@/components/AuthFields';
 import { AuthShell } from '@/components/AuthShell';
 import { useStore } from '@/components/StoreContext';
-import { apiFetch, getErrorMessage, setAuthToken } from '@/lib/api';
+import {
+  apiFetch,
+  getErrorMessage,
+  getSafeRedirectTarget,
+  setAuthToken,
+} from '@/lib/api';
 import { UserDossier } from '@/lib/types';
 import { useAccessibleFormValidation } from '@/lib/useAccessibleFormValidation';
 
@@ -23,9 +28,8 @@ const DEMO_PATRONS = [
   },
 ];
 
-function SignInFormContent() {
+export default function SignInPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { dossier, isAuthenticated, refreshDossier, signOut, announce } =
     useStore();
   const { formRef, validateBeforeSubmit } = useAccessibleFormValidation();
@@ -34,12 +38,6 @@ function SignInFormContent() {
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
-
-  const rawRedirect = searchParams.get('redirect');
-  const redirectTarget =
-    rawRedirect && rawRedirect.startsWith('/') && !rawRedirect.startsWith('//')
-      ? rawRedirect
-      : '/account';
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -63,7 +61,7 @@ function SignInFormContent() {
       setAuthToken(res.accessToken);
       await refreshDossier();
       announce(`SIGNED IN AS ${res.user.name.toUpperCase()}`);
-      router.push(redirectTarget);
+      router.push(getSafeRedirectTarget());
     } catch (err: unknown) {
       setServerError(
         getErrorMessage(err, 'INVALID PATRON EMAIL OR ACCESS PASSPHRASE'),
@@ -222,19 +220,5 @@ function SignInFormContent() {
         </div>
       </div>
     </AuthShell>
-  );
-}
-
-export default function SignInPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen bg-surface text-on-surface flex items-center justify-center font-data-mono text-xs uppercase tracking-widest">
-          INITIALIZING PATRON ACCESS...
-        </div>
-      }
-    >
-      <SignInFormContent />
-    </Suspense>
   );
 }
