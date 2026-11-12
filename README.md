@@ -1,15 +1,17 @@
 # VERSSARO // Luxury Streetwear E-Commerce Platform
 
-Full-stack e-commerce platform for **VERSSARO** featuring a NestJS v11 + Prisma + SQLite REST API (`verssaro-backend/`) and a Next.js 16 App Router + Tailwind CSS v4 storefront & Atelier HQ admin console (`verssaro-frontend/`).
+Full-stack e-commerce platform for **VERSSARO** featuring a NestJS v11 + Prisma + MySQL REST API (`verssaro-backend/`) and a Next.js 16 App Router + Tailwind CSS v4 storefront & Atelier HQ admin console (`verssaro-frontend/`).
 
 ## Architecture
 
-- **Backend (`verssaro-backend/`)**: NestJS `v11` on `http://localhost:4000/api` (Swagger docs at `http://localhost:4000/api/docs`) backed by Prisma (`v6.19.3`) and SQLite (`verssaro-backend/prisma/dev.db`), auto-seeded on startup via `SeedService`.
+- **Backend (`verssaro-backend/`)**: NestJS `v11` on `http://localhost:4000/api` (Swagger docs at `http://localhost:4000/api/docs`) backed by Prisma (`v6.19.3`) and MySQL (`verssaro_db`), auto-seeded on startup via `SeedService`.
 - **Frontend (`verssaro-frontend/`)**: Next.js `16.4.6` (App Router, Turbopack, Cache Components) on `http://localhost:3000` implementing all VERSSARO Storefront, Client Dossier & NFC Vault, and Atelier HQ Admin Console screens.
 
 ## Quick Start
 
-### 1. Start the NestJS Backend API (`:4000`)
+### 1. Configure & Start the NestJS Backend API (`:4000`)
+
+Configure `DATABASE_URL` in `verssaro-backend/.env` (see `verssaro-backend/.env.example`, e.g., `mysql://root:1234@127.0.0.1:3306/verssaro_db`), then push the Prisma schema and start the server:
 
 ```bash
 cd verssaro-backend
