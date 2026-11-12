@@ -1,0 +1,240 @@
+name: Build & Deploy to DigitalOcean
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    name: Build & Push Docker Images
+    runs-on: ubuntu-latest
+    outputs:
+      ghcr_owner: ${{ steps.meta.outputs.ghcr_owner }}
+      image_tag: ${{ github.sha }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set lowercase GHCR owner
+        id: meta
+        run: |
+          echo "ghcr_owner=$(printf '%s' "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./verssaro-backend
+          file: ./verssaro-backend/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ghcr.io/${{ steps.meta.outputs.ghcr_owner }}/verssaro-backend:${{ github.sha }}
+            ghcr.io/${{ steps.meta.outputs.ghcr_owner }}/verssaro-backend:latest
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./verssaro-frontend
+          file: ./verssaro-frontend/Dockerfile
+          platforms: linux/amd64
+          push: true
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL || '/api' }}
+          tags: |
+            ghcr.io/${{ steps.meta.outputs.ghcr_owner }}/verssaro-frontend:${{ github.sha }}
+            ghcr.io/${{ steps.meta.outputs.ghcr_owner }}/verssaro-frontend:latest
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+
+  deploy-to-droplet:
+    name: Deploy to DigitalOcean Droplet
+    needs: build-and-push
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout deploy configs
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            docker-compose.prod.yml
+            nginx/default.conf
+
+      - name: Deploy containers via SSH
+        env:
+          DO_HOST: ${{ secrets.DO_HOST }}
+          DO_USER: ${{ secrets.DO_USER }}
+          DO_PORT: ${{ secrets.DO_PORT }}
+          DO_SSH_KEY: ${{ secrets.DO_SSH_KEY }}
+          DO_SSH_KNOWN_HOSTS: ${{ secrets.DO_SSH_KNOWN_HOSTS }}
+          DO_DEPLOY_PATH: ${{ secrets.DO_DEPLOY_PATH }}
+          GHCR_OWNER: ${{ needs.build-and-push.outputs.ghcr_owner }}
+          GHCR_ACTOR: ${{ github.actor }}
+          GHCR_PULL_USER: ${{ secrets.GHCR_PULL_USER }}
+          GHCR_PULL_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE_TAG: ${{ needs.build-and-push.outputs.image_tag }}
+          MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE }}
+          MYSQL_USER: ${{ secrets.MYSQL_USER }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          CORS_ORIGIN: ${{ secrets.CORS_ORIGIN }}
+          HTTP_PORT: ${{ vars.HTTP_PORT }}
+        run: |
+          set -euo pipefail
+
+          missing=()
+          [ -n "$DO_HOST" ] || missing+=("DO_HOST")
+          [ -n "$DO_USER" ] || missing+=("DO_USER")
+          [ -n "$DO_SSH_KEY" ] || missing+=("DO_SSH_KEY")
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "Error: Missing required GitHub repository secret(s): ${missing[*]}" >&2
+            echo "Add DO_HOST, DO_USER, and DO_SSH_KEY in Settings -> Secrets and variables -> Actions." >&2
+            exit 1
+          fi
+
+          SSH_PORT="${DO_PORT:-22}"
+          DEPLOY_PATH="${DO_DEPLOY_PATH:-/opt/verssaro}"
+
+          cleanup() {
+            rm -rf "$HOME/.ssh/deploy_key" /tmp/verssaro-env-bootstrap
+          }
+          trap cleanup EXIT
+
+          umask 077
+          mkdir -p "$HOME/.ssh"
+          printf '%s\n' "$DO_SSH_KEY" > "$HOME/.ssh/deploy_key"
+          chmod 600 "$HOME/.ssh/deploy_key"
+
+          if [ -n "$DO_SSH_KNOWN_HOSTS" ]; then
+            printf '%s\n' "$DO_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          else
+            ssh-keyscan -p "$SSH_PORT" -H "$DO_HOST" > "$HOME/.ssh/known_hosts" 2>/dev/null
+          fi
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+          SSH_OPTS=(
+            -i "$HOME/.ssh/deploy_key"
+            -p "$SSH_PORT"
+            -o StrictHostKeyChecking=yes
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
+            -o ConnectTimeout=15
+          )
+          SCP_OPTS=(
+            -i "$HOME/.ssh/deploy_key"
+            -P "$SSH_PORT"
+            -o StrictHostKeyChecking=yes
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
+            -o ConnectTimeout=15
+          )
+
+          REMOTE_PATH=$(ssh "${SSH_OPTS[@]}" "$DO_USER@$DO_HOST" "bash -s" -- "$DEPLOY_PATH" <<'EOF'
+          set -euo pipefail
+          target="$1"
+          case "$target" in
+            "~/"*) target="$HOME/${target#~/}" ;;
+            "~") target="$HOME" ;;
+          esac
+          mkdir -p "$target/nginx"
+          printf '%s' "$target"
+          EOF
+          )
+
+          scp "${SCP_OPTS[@]}" docker-compose.prod.yml "$DO_USER@$DO_HOST:$REMOTE_PATH/docker-compose.yml"
+          scp "${SCP_OPTS[@]}" nginx/default.conf "$DO_USER@$DO_HOST:$REMOTE_PATH/nginx/default.conf"
+
+          HAS_REMOTE_ENV=$(ssh "${SSH_OPTS[@]}" "$DO_USER@$DO_HOST" "[ -f \"$REMOTE_PATH/.env\" ] && echo yes || echo no")
+          if [ "$HAS_REMOTE_ENV" = "no" ]; then
+            if [ -n "$MYSQL_PASSWORD" ] && [ -n "$MYSQL_ROOT_PASSWORD" ] && [ -n "$JWT_SECRET" ]; then
+              cat > /tmp/verssaro-env-bootstrap <<EOF
+          GHCR_OWNER=${GHCR_OWNER}
+          IMAGE_TAG=${IMAGE_TAG}
+          HTTP_PORT=${HTTP_PORT:-80}
+          MYSQL_DATABASE=${MYSQL_DATABASE:-verssaro_db}
+          MYSQL_USER=${MYSQL_USER:-verssaro}
+          MYSQL_PASSWORD=${MYSQL_PASSWORD}
+          MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+          JWT_SECRET=${JWT_SECRET}
+          CORS_ORIGIN=${CORS_ORIGIN:-*}
+          EOF
+              chmod 600 /tmp/verssaro-env-bootstrap
+              scp "${SCP_OPTS[@]}" /tmp/verssaro-env-bootstrap "$DO_USER@$DO_HOST:$REMOTE_PATH/.env"
+            else
+              echo "Error: $REMOTE_PATH/.env does not exist on the Droplet, and bootstrap secrets (MYSQL_PASSWORD, MYSQL_ROOT_PASSWORD, JWT_SECRET) were not provided." >&2
+              echo "Either create $REMOTE_PATH/.env on your Droplet (from .env.production.example) or add MYSQL_PASSWORD, MYSQL_ROOT_PASSWORD, and JWT_SECRET to GitHub Secrets." >&2
+              exit 1
+            fi
+          fi
+
+          if [ -n "$GHCR_PULL_TOKEN" ]; then
+            REGISTRY_TOKEN="$GHCR_PULL_TOKEN"
+            REGISTRY_USER="${GHCR_PULL_USER:-$GHCR_OWNER}"
+          else
+            REGISTRY_TOKEN="$GITHUB_TOKEN"
+            REGISTRY_USER="$GHCR_ACTOR"
+          fi
+
+          printf '%s\n' "$REGISTRY_TOKEN" | ssh "${SSH_OPTS[@]}" "$DO_USER@$DO_HOST" "docker login ghcr.io -u \"$REGISTRY_USER\" --password-stdin"
+
+          ssh "${SSH_OPTS[@]}" "$DO_USER@$DO_HOST" "bash -s" -- "$REMOTE_PATH" "$GHCR_OWNER" "$IMAGE_TAG" <<'EOF'
+          set -euo pipefail
+          cd "$1"
+          ghcr_owner="$2"
+          image_tag="$3"
+
+          if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>&1; then
+            echo "Error: Docker and the Docker Compose plugin must be installed on the Droplet." >&2
+            exit 1
+          fi
+
+          chmod 600 .env
+          grep -v -E '^(GHCR_OWNER|IMAGE_TAG)=' .env > .env.tmp || true
+          {
+            [ -s .env.tmp ] && awk '1' .env.tmp
+            printf 'GHCR_OWNER=%s\n' "$ghcr_owner"
+            printf 'IMAGE_TAG=%s\n' "$image_tag"
+          } > .env
+          rm -f .env.tmp
+          chmod 600 .env
+
+          docker compose pull
+          docker compose up -d --remove-orphans
+
+          echo "Waiting for VERSSARO proxy health endpoint..."
+          for i in $(seq 1 30); do
+            if docker compose exec -T nginx wget -qO- http://127.0.0.1/api/health >/dev/null 2>&1; then
+              echo "Deployment healthy!"
+              docker compose ps
+              docker image prune -f >/dev/null 2>&1 || true
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "Error: Health check did not pass within 60s. Recent logs:" >&2
+          docker compose logs --tail=50 >&2
+          exit 1
+          EOF

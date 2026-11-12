@@ -63,3 +63,39 @@ npm run dev
 - `/admin/clients` — VIP Patron dossier onboarding & restoration pass management
 - `/admin/promotions` — Whitelist campaign deployment & live status controls
 
+## Docker & DigitalOcean Deployment (GitHub Actions -> GHCR -> Droplet)
+
+This repository includes multi-stage Dockerfiles (`verssaro-backend/Dockerfile`, `verssaro-frontend/Dockerfile`), an Nginx reverse-proxy configuration (`nginx/default.conf`), Compose stacks (`docker-compose.yml` for local full-stack runs and `docker-compose.prod.yml` for production), and the GitHub Actions workflow `.github/workflows/deploy.yml`.
+
+### Architecture on the Droplet
+- `nginx` (port `80`): routes `/` -> `frontend:3000` and `/api` -> `backend:4000` (same-origin `/api` requests avoid hardcoded build-time IP/domain URLs).
+- `frontend` (Next.js standalone on `:3000`)
+- `backend` (NestJS API on `:4000`, automatically runs `prisma db push` and seeds initial catalog/patrons via `SeedService` if empty)
+- `mysql` (MySQL 8.4 with persistent `mysql_data` volume)
+
+### Local Docker Test
+```bash
+docker compose up --build
+```
+Then open `http://localhost:8080`.
+
+### One-Time DigitalOcean Droplet + GitHub Setup
+1. **Install Docker on the DigitalOcean Droplet** (if not using the Docker Marketplace image):
+   ```bash
+   curl -fsSL https://get.docker.com | sh
+   ```
+2. **Add GitHub Repository Secrets** (`Settings -> Secrets and variables -> Actions`):
+   - **Required**:
+     - `DO_HOST`: Droplet public IPv4 or domain
+     - `DO_USER`: SSH user (e.g. `root`, or a user in the `docker` group)
+     - `DO_SSH_KEY`: Private SSH key whose `.pub` key is in `~/.ssh/authorized_keys` on the Droplet
+   - **Recommended / Auto-bootstrap `.env` on first deploy** (alternatively create `/opt/verssaro/.env` manually on the Droplet from `.env.production.example` using alphanumeric/`-`/`_` characters for MySQL passwords):
+     - `MYSQL_PASSWORD`
+     - `MYSQL_ROOT_PASSWORD`
+     - `JWT_SECRET`
+     - `CORS_ORIGIN` (optional, defaults to `*`)
+   - **Optional**:
+     - `DO_PORT` (defaults to `22`), `DO_DEPLOY_PATH` (defaults to `/opt/verssaro`), `DO_SSH_KNOWN_HOSTS` (pinned SSH host key), `GHCR_PULL_TOKEN` (GitHub PAT with `read:packages` if you later want to run `docker compose pull` manually on the Droplet for private GHCR packages)
+3. **Push to `main`** (or trigger **Actions -> Build & Deploy to DigitalOcean -> Run workflow**).
+
+
