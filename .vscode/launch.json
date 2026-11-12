@@ -1,0 +1,80 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "VERSSARO Backend (NestJS Dev)",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/verssaro-backend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "start:debug"],
+      "sourceMaps": true,
+      "restart": true,
+      "console": "integratedTerminal",
+      "envFile": "${workspaceFolder}/verssaro-backend/.env",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "VERSSARO Frontend (Next.js Server-Side)",
+      "type": "node-terminal",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/verssaro-frontend",
+      "command": "npm run dev",
+      "envFile": "${workspaceFolder}/verssaro-frontend/.env.local"
+    },
+    {
+      "name": "VERSSARO Browser (Chrome Client)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:3000",
+      "webRoot": "${workspaceFolder}/verssaro-frontend"
+    },
+    {
+      "name": "VERSSARO Backend (Prod Dist)",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/verssaro-backend",
+      "program": "${workspaceFolder}/verssaro-backend/dist/main.js",
+      "preLaunchTask": "verssaro-backend: build",
+      "sourceMaps": true,
+      "outFiles": ["${workspaceFolder}/verssaro-backend/dist/**/*.js"],
+      "console": "integratedTerminal",
+      "envFile": "${workspaceFolder}/verssaro-backend/.env",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "VERSSARO Backend (Jest Unit Tests)",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/verssaro-backend",
+      "runtimeArgs": [
+        "--inspect-brk",
+        "${workspaceFolder}/verssaro-backend/node_modules/.bin/jest",
+        "--runInBand"
+      ],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "skipFiles": ["<node_internals>/**"]
+    }
+  ],
+  "compounds": [
+    {
+      "name": "VERSSARO Full Stack (Backend + Frontend)",
+      "configurations": [
+        "VERSSARO Backend (NestJS Dev)",
+        "VERSSARO Frontend (Next.js Server-Side)"
+      ],
+      "stopAll": true
+    },
+    {
+      "name": "VERSSARO Full Stack + Chrome",
+      "configurations": [
+        "VERSSARO Backend (NestJS Dev)",
+        "VERSSARO Frontend (Next.js Server-Side)",
+        "VERSSARO Browser (Chrome Client)"
+      ],
+      "stopAll": true
+    }
+  ]
+}
+

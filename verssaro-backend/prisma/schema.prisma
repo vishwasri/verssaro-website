@@ -1,0 +1,313 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                         String         @id @default(cuid())
+  email                      String         @unique
+  passwordHash               String
+  name                       String
+  role                       String         @default("CLIENT") // CLIENT | ADMIN
+  dossierCode                String         @unique
+  tier                       String         @default("TIER 01 // PRIVATE CIRCLE")
+  vipActive                  Boolean        @default(true)
+  walletAddress              String
+  walletFull                 String
+  atelierHub                 String         @default("COLOMBO & LONDON")
+  phone                      String?
+  liaisonName                String         @default("LAKSHAN P.")
+  liaisonNotes               String         @default("Prefers architectural silhouettes, matte obsidian washes, and Colombo White-Glove courier.")
+  totalSpendUsd              Float          @default(0)
+  restorationPassesRemaining Int            @default(4)
+  restorationPassesTotal     Int            @default(4)
+  storeCreditUsd             Float          @default(480)
+  kycStatus                  String         @default("KYC-ROOT VERIFIED")
+  recentLedgerNote           String?
+  createdAt                  DateTime       @default(now())
+  updatedAt                  DateTime       @updatedAt
+  addresses                  Address[]
+  orders                     Order[]
+  wishlistItems              WishlistItem[]
+  nfcArtifacts               NfcArtifact[]
+}
+
+model Address {
+  id                   String   @id @default(cuid())
+  userId               String
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label                String
+  classification       String   @default("RESIDENTIAL") // RESIDENTIAL | OFFICE | PRIVATE_VAULT
+  isDefault            Boolean  @default(false)
+  recipientName        String
+  company              String?
+  addressLine1         String
+  addressLine2         String?
+  city                 String
+  province             String?
+  postalCode           String
+  country              String
+  countryCode          String   @default("LK")
+  phone                String
+  carrierPreference    String   @default("COLOMBO WHITE-GLOVE SAME DAY")
+  deliveryInstructions String?
+  packagingSpec        String   @default("ARCHIVAL_MONOLITH_BOX")
+  coordinates          String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model Product {
+  id               String          @id @default(cuid())
+  slug             String          @unique
+  sku              String          @unique
+  seriesCode       String
+  name             String
+  subtitle         String
+  category         String          // tees | hoodies | cargo | outerwear | accessories
+  categoryLabel    String
+  capsule          String
+  editionLabel     String
+  priceUsd         Float
+  compareAtUsd     Float?
+  cogsUsd          Float
+  gsm              Int?
+  material         String
+  silhouette       String          @default("boxy") // relaxed | boxy | tailored
+  description      String
+  fitNotes         String
+  careNotes        String
+  badge            String?
+  status           String          @default("LIVE") // LIVE | UPCOMING | DRAFT | SOLD_OUT
+  isFeatured       Boolean         @default(false)
+  isBestseller     Boolean         @default(false)
+  isNewDrop        Boolean         @default(false)
+  ratingAvg        Float           @default(4.9)
+  reviewCount      Int             @default(0)
+  colorwaysJson    String          // JSON: [{ name, hex, slug }]
+  sizesJson        String          // JSON: [{ size, stock, colombo, london, dubai }]
+  imagesJson       String          // JSON: string[]
+  measurementsJson String          // JSON: [{ size, chest, length, shoulder, sleeve }]
+  nfcEnabled       Boolean         @default(true)
+  siliconLocation  String          @default("Passive HF NFC Hem Seam")
+  smartPerk        String          @default("24H Early Drop Pass + Atelier Restoration Access")
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  reviews          Review[]
+  cartItems        CartItem[]
+  wishlistItems    WishlistItem[]
+  orderItems       OrderItem[]
+  nfcArtifacts     NfcArtifact[]
+  stockMovements   StockMovement[]
+}
+
+model Review {
+  id             String   @id @default(cuid())
+  productId      String
+  product        Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  authorName     String
+  authorLocation String   @default("Colombo / Verified Client")
+  verifiedBuyer  Boolean  @default(true)
+  rating         Int
+  fitFeedback    String   @default("true_to_size") // runs_small | true_to_size | oversized
+  title          String
+  body           String
+  sizePurchased  String   @default("L")
+  colorPurchased String   @default("Obsidian Black")
+  helpfulCount   Int      @default(0)
+  createdAt      DateTime @default(now())
+}
+
+model CartItem {
+  id        String   @id @default(cuid())
+  sessionId String
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  size      String
+  colorName String
+  colorHex  String   @default("#000000")
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([sessionId, productId, size, colorName])
+}
+
+model CartSession {
+  sessionId     String   @id
+  promoCode     String?
+  collectorBox  Boolean  @default(true)
+  giftMessage   String?
+  reservedUntil DateTime
+  updatedAt     DateTime @updatedAt
+}
+
+model WishlistItem {
+  id            String   @id @default(cuid())
+  sessionId     String
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  productId     String
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  selectedSize  String   @default("L")
+  selectedColor String   @default("Obsidian Black")
+  stockState    String   @default("IN_STOCK") // IN_STOCK | LOW_STOCK | PRE_ORDER
+  createdAt     DateTime @default(now())
+
+  @@unique([sessionId, productId])
+}
+
+model PromoCode {
+  id               String   @id @default(cuid())
+  code             String   @unique
+  name             String
+  description      String
+  campaignType     String   @default("VIP_WHITELIST") // VIP_WHITELIST | TIERED_BASKET | CONCIERGE | STANDARD
+  discountType     String   @default("PERCENT") // PERCENT | FIXED
+  discountValue    Float
+  minSubtotalUsd   Float    @default(0)
+  gateTarget       String   @default("Open Registry")
+  marginCapPercent Float    @default(18)
+  claimsUsed       Int      @default(0)
+  claimsLimit      Int      @default(500)
+  attributedRevUsd Float    @default(0)
+  status           String   @default("LIVE") // LIVE | SCHEDULED | ARCHIVED
+  endsAt           DateTime
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model Order {
+  id                    String        @id @default(cuid())
+  orderNumber           String        @unique
+  userId                String?
+  user                  User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  sessionId             String
+  customerName          String
+  email                 String
+  phone                 String?
+  status                String        @default("UNFULFILLED") // UNFULFILLED | PROCESSING_QC | DISPATCHED | DELIVERED | HOLD
+  paymentMethod         String        @default("card")
+  paymentStatus         String        @default("SETTLED")
+  shippingMethod        String        @default("colombo_same_day")
+  carrierName           String        @default("DHL Express Priority / Atelier Dispatch")
+  trackingNumber        String
+  destinationCode       String        @default("CMB-03")
+  shippingAddressJson   String
+  packagingManifestJson String
+  subtotalUsd           Float
+  discountUsd           Float         @default(0)
+  shippingUsd           Float         @default(0)
+  dutyUsd               Float         @default(0)
+  totalUsd              Float
+  promoCodeUsed         String?
+  milestoneStep         Int           @default(2)
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  items                 OrderItem[]
+  nfcArtifacts          NfcArtifact[]
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  sku       String
+  name      String
+  size      String
+  colorName String
+  imageUrl  String
+  unitPrice Float
+  quantity  Int
+  lineTotal Float
+}
+
+model NfcArtifact {
+  id              String          @id @default(cuid())
+  uid             String          @unique
+  tagLabel        String          @unique
+  keccakHash      String
+  tokenId         String
+  contractAddress String          @default("0x7F91a8C3E40B18F004192C4e")
+  productId       String?
+  product         Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
+  orderId         String?
+  order           Order?          @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  ownerUserId     String?
+  ownerUser       User?           @relation(fields: [ownerUserId], references: [id], onDelete: SetNull)
+  garmentTitle    String
+  sku             String
+  colorway        String
+  size            String
+  acquiredLabel   String          @default("JAN 2025")
+  valuationUsd    Float
+  editionRun      String          @default("RUN 01/50 // ED. #012")
+  textileSpec     String
+  siliconLocation String          @default("Passive HF NFC Hem Seam")
+  smartPerk       String
+  warehouseNode   String          @default("Client Custody")
+  status          String          @default("ACTIVE_BOUND") // ACTIVE_BOUND | PENDING_SEEDING | IN_TRANSIT | BURNED
+  imageUrl        String
+  lastVerifiedAt  DateTime        @default(now())
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  transfers       VaultTransfer[]
+}
+
+model VaultTransfer {
+  id                  String      @id @default(cuid())
+  receiptCode         String      @unique
+  artifactId          String
+  artifact            NfcArtifact @relation(fields: [artifactId], references: [id], onDelete: Cascade)
+  fromOwnerName       String
+  fromWallet          String
+  toOwnerName         String
+  toWallet            String
+  transferMethod      String      @default("HEX") // HEX | VIP_HANDLE | ESCROW
+  valuationUsd        Float
+  royaltyUsd          Float
+  gasMatic            String      @default("0.0000 MATIC")
+  txHash              String      @unique
+  blockNumber         Int
+  networkName         String      @default("Polygon PoS // Atelier Rollup")
+  status              String      @default("CONFIRMED")
+  reassignedPerksJson String
+  createdAt           DateTime    @default(now())
+}
+
+model StockMovement {
+  id            String   @id @default(cuid())
+  productId     String
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sku           String
+  garmentTitle  String
+  fromNode      String
+  toNode        String
+  quantity      Int
+  movementType  String   @default("INTER_VAULT")
+  initiatedBy   String   @default("ATELIER OPS // LAKSHAN P.")
+  referenceCode String
+  status        String   @default("COMPLETED")
+  createdAt     DateTime @default(now())
+}
+
+model NewsletterSubscriber {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  source    String   @default("FOOTER_INNER_CIRCLE")
+  createdAt DateTime @default(now())
+}
+
+model SystemConfig {
+  id                String   @id
+  botLockdownActive Boolean  @default(false)
+  maintenanceMode   Boolean  @default(false)
+  updatedAt         DateTime @updatedAt
+}
+
