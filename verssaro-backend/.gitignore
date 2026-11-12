@@ -1,0 +1,19 @@
+# Dependencies & compiled output
+/node_modules
+/dist
+/coverage
+*.tsbuildinfo
+
+# Local environment secrets (keep .env.example)
+.env
+.env.*.local
+!.env.example
+
+# Local SQLite database artifacts
+prisma/*.db
+prisma/*.db-journal
+
+# Logs & OS files
+*.log
+.DS_Store
+
