@@ -98,4 +98,12 @@ Then open `http://localhost:8080`.
      - `DO_PORT` (defaults to `22`), `DO_DEPLOY_PATH` (defaults to `/opt/verssaro`), `DO_SSH_KNOWN_HOSTS` (pinned SSH host key), `GHCR_PULL_TOKEN` (GitHub PAT with `read:packages` if you later want to run `docker compose pull` manually on the Droplet for private GHCR packages)
 3. **Push to `main`** (or trigger **Actions -> Build & Deploy to DigitalOcean -> Run workflow**).
 
+### Custom Domain & Automated HTTPS / SSL (`verssaro.com`)
+- DNS `A` record `@` and `CNAME` record `www` point to the Droplet public IP.
+- Nginx listens on ports `80` and `443` with `nginx/production.conf`.
+- `init-ssl.sh` automatically provisions Let's Encrypt certificates for `verssaro.com` and `www.verssaro.com`, handles the ACME HTTP-01 challenge, and reloads Nginx.
+- The `certbot` companion container in `docker-compose.prod.yml` runs every 12 hours to renew certificates automatically before expiration.
+- All public HTTP traffic is redirected to `https://verssaro.com$request_uri`.
+
+
 

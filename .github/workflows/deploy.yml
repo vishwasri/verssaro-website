@@ -80,7 +80,9 @@ jobs:
         with:
           sparse-checkout: |
             docker-compose.prod.yml
+            nginx/production.conf
             nginx/default.conf
+            init-ssl.sh
 
       - name: Deploy containers via SSH
         env:
@@ -158,13 +160,15 @@ jobs:
             "~/"*) target="$HOME/${target#~/}" ;;
             "~") target="$HOME" ;;
           esac
-          mkdir -p "$target/nginx"
+          mkdir -p "$target/nginx" "$target/certbot/conf" "$target/certbot/www"
           printf '%s' "$target"
           EOF
           )
 
           scp "${SCP_OPTS[@]}" docker-compose.prod.yml "$DO_USER@$DO_HOST:$REMOTE_PATH/docker-compose.yml"
+          scp "${SCP_OPTS[@]}" nginx/production.conf "$DO_USER@$DO_HOST:$REMOTE_PATH/nginx/production.conf"
           scp "${SCP_OPTS[@]}" nginx/default.conf "$DO_USER@$DO_HOST:$REMOTE_PATH/nginx/default.conf"
+          scp "${SCP_OPTS[@]}" init-ssl.sh "$DO_USER@$DO_HOST:$REMOTE_PATH/init-ssl.sh"
 
           HAS_REMOTE_ENV=$(ssh "${SSH_OPTS[@]}" "$DO_USER@$DO_HOST" "[ -f \"$REMOTE_PATH/.env\" ] && echo yes || echo no")
           if [ "$HAS_REMOTE_ENV" = "no" ]; then
@@ -221,6 +225,11 @@ jobs:
           chmod 600 .env
 
           docker compose pull
+
+          # Automate SSL initialization & cert renewal for verssaro.com
+          chmod +x init-ssl.sh
+          ./init-ssl.sh verssaro.com admin@verssaro.com "$1"
+
           docker compose up -d --remove-orphans
 
           echo "Waiting for VERSSARO proxy health endpoint..."
