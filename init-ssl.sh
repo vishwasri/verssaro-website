@@ -49,19 +49,15 @@ if [ "$IS_DUMMY" = "1" ]; then
   rm -rf "certbot/conf/live/$DOMAIN" "certbot/conf/archive/$DOMAIN" "certbot/conf/renewal/$DOMAIN.conf"
 
   echo ">> Requesting Let's Encrypt SSL certificate for $DOMAIN and www.$DOMAIN..."
-  docker compose run --rm --entrypoint "\
-    certbot certonly --webroot -w /var/www/certbot \
-      -d $DOMAIN -d www.$DOMAIN \
-      --email $EMAIL --agree-tos --no-eff-email --non-interactive" certbot
+  docker compose run --rm --entrypoint /bin/sh certbot -c \
+    "certbot certonly --webroot -w /var/www/certbot -d $DOMAIN -d www.$DOMAIN --email $EMAIL --agree-tos --no-eff-email --non-interactive"
 
   echo ">> Reloading Nginx with the verified SSL certificate..."
   docker compose exec -T nginx nginx -s reload
 else
   echo ">> Valid Let's Encrypt certificate is already active. Checking for renewals..."
-  docker compose run --rm --entrypoint "\
-    certbot certonly --webroot -w /var/www/certbot \
-      -d $DOMAIN -d www.$DOMAIN \
-      --email $EMAIL --agree-tos --no-eff-email --non-interactive --keep-until-expiring" certbot
+  docker compose run --rm --entrypoint /bin/sh certbot -c \
+    "certbot certonly --webroot -w /var/www/certbot -d $DOMAIN -d www.$DOMAIN --email $EMAIL --agree-tos --no-eff-email --non-interactive --keep-until-expiring"
   docker compose exec -T nginx nginx -s reload
 fi
 
