@@ -13,43 +13,56 @@ echo "Admin Email:   $EMAIL"
 
 mkdir -p "certbot/conf/live/$DOMAIN" "certbot/www"
 
-# 1. Create a temporary bootstrap certificate if none exists yet so Nginx can start
+# Check if the existing cert is missing or self-signed
+IS_DUMMY=0
 if [ ! -f "certbot/conf/live/$DOMAIN/fullchain.pem" ]; then
+  IS_DUMMY=1
+elif openssl x509 -in "certbot/conf/live/$DOMAIN/fullchain.pem" -issuer -noout 2>/dev/null | grep -qv "Let's Encrypt\|ISRG"; then
+  IS_DUMMY=1
+fi
+
+if [ "$IS_DUMMY" = "1" ]; then
   echo ">> Generating temporary bootstrap SSL certificate for initial Nginx boot..."
+  mkdir -p "certbot/conf/live/$DOMAIN"
   if command -v openssl >/dev/null 2>&1; then
     openssl req -x509 -nodes -newkey rsa:2048 -days 1 \
       -keyout "certbot/conf/live/$DOMAIN/privkey.pem" \
       -out "certbot/conf/live/$DOMAIN/fullchain.pem" \
       -subj "/CN=$DOMAIN"
-  else
-    docker run --rm -v "$(pwd)/certbot/conf/live/$DOMAIN:/certs" alpine/openssl \
-      req -x509 -nodes -newkey rsa:2048 -days 1 \
-      -keyout /certs/privkey.pem \
-      -out /certs/fullchain.pem \
-      -subj "/CN=$DOMAIN"
   fi
 fi
 
-# 2. Open firewall ports if UFW is installed
+# Open firewall ports if UFW is installed
 if command -v ufw >/dev/null 2>&1; then
   echo ">> Ensuring UFW firewall allows HTTP (80) and HTTPS (443)..."
   ufw allow 80/tcp >/dev/null 2>&1 || true
   ufw allow 443/tcp >/dev/null 2>&1 || true
 fi
 
-# 3. Ensure Nginx is running and responding to ACME challenge
-echo ">> Starting Nginx container..."
+# Ensure Nginx is running and responding
+echo ">> Ensuring Nginx container is running..."
 docker compose up -d nginx
 
-# 4. Request the official Let's Encrypt certificate
-echo ">> Requesting Let's Encrypt SSL certificate for $DOMAIN and www.$DOMAIN..."
-docker compose run --rm --entrypoint "\
-  certbot certonly --webroot -w /var/www/certbot \
-    -d $DOMAIN -d www.$DOMAIN \
-    --email $EMAIL --agree-tos --no-eff-email --non-interactive --keep-until-expiring" certbot
+# If current cert is a dummy cert, remove it so Certbot creates genuine Let's Encrypt archive & live symlinks
+if [ "$IS_DUMMY" = "1" ]; then
+  echo ">> Removing bootstrap certificate before issuing official Let's Encrypt cert..."
+  rm -rf "certbot/conf/live/$DOMAIN" "certbot/conf/archive/$DOMAIN" "certbot/conf/renewal/$DOMAIN.conf"
 
-# 5. Reload Nginx to activate the verified certificate
-echo ">> Reloading Nginx with the verified SSL certificate..."
-docker compose exec -T nginx nginx -s reload
+  echo ">> Requesting Let's Encrypt SSL certificate for $DOMAIN and www.$DOMAIN..."
+  docker compose run --rm --entrypoint "\
+    certbot certonly --webroot -w /var/www/certbot \
+      -d $DOMAIN -d www.$DOMAIN \
+      --email $EMAIL --agree-tos --no-eff-email --non-interactive" certbot
 
-echo ">> SSL deployment complete! Visit: https://$DOMAIN"
+  echo ">> Reloading Nginx with the verified SSL certificate..."
+  docker compose exec -T nginx nginx -s reload
+else
+  echo ">> Valid Let's Encrypt certificate is already active. Checking for renewals..."
+  docker compose run --rm --entrypoint "\
+    certbot certonly --webroot -w /var/www/certbot \
+      -d $DOMAIN -d www.$DOMAIN \
+      --email $EMAIL --agree-tos --no-eff-email --non-interactive --keep-until-expiring" certbot
+  docker compose exec -T nginx nginx -s reload
+fi
+
+echo ">> SSL setup complete! Visit: https://$DOMAIN"
