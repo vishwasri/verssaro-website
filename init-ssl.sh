@@ -8,7 +8,7 @@ TARGET_DIR="${3:-.}"
 cd "$TARGET_DIR"
 
 echo "=== VERSSARO SSL Automation (Let's Encrypt / Certbot) ==="
-echo "Target Domain: $DOMAIN, www.$DOMAIN"
+echo "Target Domains: $DOMAIN, www.$DOMAIN, rent.$DOMAIN"
 echo "Admin Email:   $EMAIL"
 
 mkdir -p "certbot/conf/live/$DOMAIN" "certbot/www"
@@ -50,9 +50,9 @@ if [ ! -f "certbot/conf/renewal/$DOMAIN.conf" ]; then
   rm -rf "certbot/conf/live/$DOMAIN" "certbot/conf/archive/$DOMAIN" "certbot/conf/renewal/$DOMAIN.conf"
 
   # 4. Request the official Let's Encrypt certificate
-  echo ">> Requesting Let's Encrypt SSL certificate for $DOMAIN and www.$DOMAIN..."
+  echo ">> Requesting Let's Encrypt SSL certificate for $DOMAIN, www.$DOMAIN, and rent.$DOMAIN..."
   docker compose run --rm --entrypoint /bin/sh certbot -c \
-    "certbot certonly --webroot -w /var/www/certbot -d $DOMAIN -d www.$DOMAIN --email $EMAIL --agree-tos --no-eff-email --non-interactive"
+    "certbot certonly --webroot -w /var/www/certbot --cert-name $DOMAIN --expand -d $DOMAIN -d www.$DOMAIN -d rent.$DOMAIN --email $EMAIL --agree-tos --no-eff-email --non-interactive"
 
   # 5. Reload Nginx with verified certificate
   echo ">> Reloading Nginx with the verified SSL certificate..."
@@ -61,9 +61,9 @@ if [ ! -f "certbot/conf/renewal/$DOMAIN.conf" ]; then
   echo ">> Official Let's Encrypt SSL certificate successfully installed!"
 else
   echo ">> Official Let's Encrypt certificate is already active (found certbot/conf/renewal/$DOMAIN.conf)."
-  echo ">> Checking for renewals..."
+  echo ">> Ensuring the certificate covers $DOMAIN, www.$DOMAIN, and rent.$DOMAIN..."
   docker compose run --rm --entrypoint /bin/sh certbot -c \
-    "certbot renew --webroot -w /var/www/certbot --quiet"
+    "certbot certonly --webroot -w /var/www/certbot --cert-name $DOMAIN --expand -d $DOMAIN -d www.$DOMAIN -d rent.$DOMAIN --email $EMAIL --agree-tos --no-eff-email --non-interactive"
   docker compose exec -T nginx nginx -s reload || true
 fi
 
