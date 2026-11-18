@@ -227,6 +227,7 @@ jobs:
           docker compose pull
 
           # Automate SSL initialization & cert renewal for verssaro.com
+          docker network inspect verssaro_proxy >/dev/null 2>&1 || docker network create verssaro_proxy >/dev/null
           chmod +x init-ssl.sh
           ./init-ssl.sh verssaro.com admin@verssaro.com "$1"
 
