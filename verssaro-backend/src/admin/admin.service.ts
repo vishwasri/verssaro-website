@@ -6,10 +6,8 @@ import {
 import * as bcrypt from 'bcryptjs';
 import { Type } from 'class-transformer';
 import {
-  IsBoolean,
   IsEmail,
   IsIn,
-  IsInt,
   IsNumber,
   IsOptional,
   IsString,
@@ -17,26 +15,6 @@ import {
 } from 'class-validator';
 import { serializeProduct } from '../common/product-mapper';
 import { PrismaService } from '../prisma/prisma.service';
-
-export class TransferVaultStockDto {
-  @IsString()
-  productId!: string;
-
-  @IsString()
-  fromNode!: string;
-
-  @IsString()
-  toNode!: string;
-
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  quantity!: number;
-
-  @IsOptional()
-  @IsString()
-  size?: string;
-}
 
 export class CreateVipClientDto {
   @IsString()
@@ -65,16 +43,7 @@ export class UpdateVipClientDto {
 
   @IsOptional()
   @IsString()
-  kycStatus?: string;
-
-  @IsOptional()
-  @IsString()
   liaisonNotes?: string;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  restorationPassesRemaining?: number;
 }
 
 export class CreatePromoDto {
@@ -88,7 +57,7 @@ export class CreatePromoDto {
   @IsString()
   description?: string;
 
-  @IsIn(['VIP_WHITELIST', 'TIERED_BASKET', 'CONCIERGE', 'STANDARD'])
+  @IsIn(['VIP_WHITELIST', 'TIERED_BASKET', 'CONCIERGE', 'STANDARD', 'HERITAGE_PROMO'])
   campaignType!: string;
 
   @IsIn(['PERCENT', 'FIXED'])
@@ -114,11 +83,6 @@ export class UpdatePromoStatusDto {
   status!: string;
 }
 
-export class LockdownDto {
-  @IsBoolean()
-  botLockdownActive!: boolean;
-}
-
 export class NewsletterDto {
   @IsEmail()
   email!: string;
@@ -133,16 +97,10 @@ export class AdminService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getDashboardTelemetry() {
-    const [products, orders, nfc, transfers, sys] = await Promise.all([
+    const [products, orders, enquiries] = await Promise.all([
       this.prisma.product.findMany(),
-      this.prisma.order.findMany({ orderBy: { createdAt: 'desc' }, take: 5 }),
-      this.prisma.nfcArtifact.findMany(),
-      this.prisma.vaultTransfer.findMany({
-        include: { artifact: true },
-        orderBy: { createdAt: 'desc' },
-        take: 5,
-      }),
-      this.prisma.systemConfig.findUnique({ where: { id: 'singleton' } }),
+      this.prisma.order.findMany({ orderBy: { createdAt: 'desc' }, take: 10 }),
+      this.prisma.enquiry.findMany({ orderBy: { createdAt: 'desc' }, take: 10 }),
     ]);
 
     const orderRev = orders.reduce((s, o) => s + o.totalUsd, 0);
@@ -151,54 +109,38 @@ export class AdminService {
       (s, p) => s + p.priceUsd * p.totalStock,
       0,
     );
-    const totalTransfersVal = transfers.reduce((s, t) => s + t.valuationUsd, 0);
-    const royaltyTotal = transfers.reduce((s, t) => s + t.royaltyUsd, 0);
 
     return {
-      botLockdownActive: sys?.botLockdownActive ?? false,
       kpis: {
-        grossRevenueUsd: 482900 + orderRev,
-        grossRevenueDelta: '+24.4%',
-        nfcBindingsCount: 1415 + nfc.filter((n) => n.status === 'ACTIVE_BOUND').length,
-        totalNfcPool: 1500,
-        pendingSeedingCount: nfc.filter((n) => n.status === 'PENDING_SEEDING').length,
-        p2pVolumeUsd: 184200 + totalTransfersVal,
-        p2pTransfersCount: 208 + transfers.length,
-        royaltyYieldUsd: 9210 + royaltyTotal,
+        grossRevenueUsd: orderRev,
+        orderCount: orders.length,
+        enquiryCount: enquiries.length,
         vaultAssetsUsd,
+        productCount: products.length,
         hubLoads: [
-          { node: 'COLOMBO FLAGSHIP', capPercent: 98 },
-          { node: 'LONDON SUITE (MAYFAIR)', capPercent: 92 },
-          { node: 'DUBAI PRIVATE VAULT', capPercent: 84 },
+          { node: 'COLOMBO ATELIER', capPercent: 95 },
         ],
       },
       dropVelocitySeries: [
-        { day: 'T-30 DAYS', primaryMint: 110, resaleFloor: 135 },
-        { day: 'T-21 DAYS', primaryMint: 210, resaleFloor: 320 },
-        { day: 'T-14 DAYS', primaryMint: 295, resaleFloor: 580 },
-        { day: 'T-7 DAYS', primaryMint: 360, resaleFloor: 960 },
-        { day: 'CURRENT RUN', primaryMint: 440, resaleFloor: 1450 },
+        { day: 'WEEK 1', primaryMint: 25, resaleFloor: 45 },
+        { day: 'WEEK 2', primaryMint: 50, resaleFloor: 45 },
+        { day: 'WEEK 3', primaryMint: 85, resaleFloor: 45 },
+        { day: 'WEEK 4', primaryMint: 120, resaleFloor: 45 },
       ],
       recentOrders: orders,
-      recentTransfers: transfers,
+      recentEnquiries: enquiries,
     };
   }
 
   async getInventoryMatrix() {
-    const [products, movements] = await Promise.all([
-      this.prisma.product.findMany({ orderBy: { priceUsd: 'desc' } }),
-      this.prisma.stockMovement.findMany({
-        orderBy: { createdAt: 'desc' },
-        take: 25,
-      }),
-    ]);
+    const products = await this.prisma.product.findMany({
+      orderBy: { priceUsd: 'desc' },
+    });
 
     const rows = products.map((p) => {
       const s = serializeProduct(p);
-      const colombo = s.sizes.reduce((acc, r) => acc + (r.colombo ?? 0), 0);
-      const london = s.sizes.reduce((acc, r) => acc + (r.london ?? 0), 0);
-      const dubai = s.sizes.reduce((acc, r) => acc + (r.dubai ?? 0), 0);
-      const reserved = Math.min(s.totalStock, Math.max(1, Math.floor(s.totalStock * 0.12)));
+      const colombo = s.sizes.reduce((acc, r) => acc + (r.colombo ?? r.stock ?? 0), 0);
+      const reserved = Math.min(s.totalStock, Math.max(1, Math.floor(s.totalStock * 0.1)));
       const available = Math.max(0, s.totalStock - reserved);
       return {
         productId: s.id,
@@ -208,8 +150,6 @@ export class AdminService {
         category: s.category,
         totalStock: s.totalStock,
         colombo,
-        london,
-        dubai,
         reserved,
         available,
         status: s.totalStock <= 15 ? 'LOW STOCK' : 'OPTIMAL',
@@ -217,76 +157,13 @@ export class AdminService {
       };
     });
 
-    return { rows, movements };
-  }
-
-  async transferVaultStock(dto: TransferVaultStockDto) {
-    const product = await this.prisma.product.findFirst({
-      where: { OR: [{ id: dto.productId }, { sku: dto.productId }] },
-    });
-    if (!product) throw new NotFoundException('Product not found');
-
-    const sizes = JSON.parse(product.sizesJson || '[]') as {
-      size: string;
-      stock: number;
-      colombo: number;
-      london: number;
-      dubai: number;
-    }[];
-
-    const keyForNode = (n: string): 'colombo' | 'london' | 'dubai' => {
-      const lower = n.toLowerCase();
-      if (lower.includes('london')) return 'london';
-      if (lower.includes('dubai')) return 'dubai';
-      return 'colombo';
-    };
-
-    const fromKey = keyForNode(dto.fromNode);
-    const toKey = keyForNode(dto.toNode);
-    let remaining = dto.quantity;
-
-    const updatedSizes = sizes.map((row) => {
-      if (remaining <= 0) return row;
-      if (dto.size && row.size.toUpperCase() !== dto.size.toUpperCase()) {
-        return row;
-      }
-      const avail = row[fromKey] ?? 0;
-      const move = Math.min(avail, remaining);
-      remaining -= move;
-      return {
-        ...row,
-        [fromKey]: avail - move,
-        [toKey]: (row[toKey] ?? 0) + move,
-      };
-    });
-
-    await this.prisma.product.update({
-      where: { id: product.id },
-      data: { sizesJson: JSON.stringify(updatedSizes) },
-    });
-
-    const movement = await this.prisma.stockMovement.create({
-      data: {
-        productId: product.id,
-        sku: product.sku,
-        garmentTitle: product.name,
-        fromNode: dto.fromNode,
-        toNode: dto.toNode,
-        quantity: dto.quantity,
-        movementType: 'INTER_VAULT',
-        initiatedBy: 'ATELIER OPS // CONSOLE',
-        referenceCode: `MV-2025-${Math.floor(1000 + Math.random() * 8999)}`,
-        status: 'COMPLETED',
-      },
-    });
-
-    return { movement, inventory: await this.getInventoryMatrix() };
+    return { rows, movements: [] };
   }
 
   async listClients(tier?: string, q?: string) {
     const users = await this.prisma.user.findMany({
       include: {
-        _count: { select: { nfcArtifacts: true, orders: true } },
+        _count: { select: { orders: true, enquiries: true } },
       },
       orderBy: { totalSpendUsd: 'desc' },
     });
@@ -294,21 +171,19 @@ export class AdminService {
     const filtered = users
       .map(({ passwordHash: _omit, ...u }) => ({
         ...u,
-        piecesCount: u._count.nfcArtifacts,
         ordersCount: u._count.orders,
+        enquiriesCount: u._count.enquiries,
       }))
       .filter((u) => {
         if (tier && tier !== 'ALL') {
-          if (tier === 'KYC_PENDING' && !u.kycStatus.includes('PENDING')) return false;
-          if (tier === 'TIER_01' && !u.tier.includes('01')) return false;
-          if (tier === 'TIER_02' && !u.tier.includes('02')) return false;
+          if (!u.tier.toLowerCase().includes(tier.toLowerCase())) return false;
         }
         if (q && q.trim()) {
           const term = q.trim().toLowerCase();
           return (
             u.name.toLowerCase().includes(term) ||
             u.dossierCode.toLowerCase().includes(term) ||
-            u.walletAddress.toLowerCase().includes(term)
+            u.email.toLowerCase().includes(term)
           );
         }
         return true;
@@ -317,11 +192,8 @@ export class AdminService {
     return {
       clients: filtered,
       summary: {
-        totalClients: users.length + 478,
-        tier01Count: users.filter((u) => u.tier.includes('01')).length + 22,
-        tier02Count: users.filter((u) => u.tier.includes('02')).length + 116,
-        avgLtvUsd: 6840,
-        activePasses: users.reduce((s, u) => s + u.restorationPassesRemaining, 0) + 173,
+        totalClients: users.length,
+        avgLtvUsd: users.length ? Number((users.reduce((s, u) => s + u.totalSpendUsd, 0) / users.length).toFixed(2)) : 0,
       },
     };
   }
@@ -333,11 +205,6 @@ export class AdminService {
 
     const passwordHash = await bcrypt.hash('verssaro2025', 10);
     const suffix = Math.floor(1000 + Math.random() * 8999);
-    const walletHex = Array.from({ length: 20 }, () =>
-      Math.floor(Math.random() * 256)
-        .toString(16)
-        .padStart(2, '0'),
-    ).join('');
 
     const { passwordHash: _omit, ...created } = await this.prisma.user.create({
       data: {
@@ -345,12 +212,10 @@ export class AdminService {
         email,
         passwordHash,
         dossierCode: `DOSSIER // ${suffix}-VIP`,
-        tier: dto.tier || 'TIER 02 // SOVEREIGN VERIFIED',
-        atelierHub: dto.atelierHub || 'COLOMBO 07 / LONDON',
+        tier: dto.tier || 'HERITAGE PATRON',
+        atelierHub: dto.atelierHub || 'COLOMBO FLAGSHIP',
         liaisonName: dto.liaisonName || 'LAKSHAN P.',
-        walletAddress: `0x${walletHex.slice(0, 4)}...${walletHex.slice(-4)}`,
-        walletFull: `0x${walletHex}`,
-        storeCreditUsd: 250,
+        storeCreditUsd: 100,
       },
     });
     return created;
@@ -364,12 +229,8 @@ export class AdminService {
       where: { id },
       data: {
         ...(dto.tier ? { tier: dto.tier } : {}),
-        ...(dto.kycStatus ? { kycStatus: dto.kycStatus } : {}),
         ...(dto.liaisonNotes !== undefined
           ? { liaisonNotes: dto.liaisonNotes }
-          : {}),
-        ...(dto.restorationPassesRemaining !== undefined
-          ? { restorationPassesRemaining: dto.restorationPassesRemaining }
           : {}),
       },
     });
@@ -413,13 +274,13 @@ export class AdminService {
       data: {
         code,
         name: dto.name.trim(),
-        description: dto.description?.trim() || 'Sovereign VIP Incentive',
+        description: dto.description?.trim() || 'Heritage VIP Incentive',
         campaignType: dto.campaignType,
         discountType: dto.discountType,
         discountValue: dto.discountValue,
         minSubtotalUsd: dto.minSubtotalUsd ?? 0,
         gateTarget: dto.gateTarget || 'VIP Private Registry',
-        endsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+        endsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       },
     });
   }
@@ -433,18 +294,6 @@ export class AdminService {
     });
   }
 
-  async setLockdown(dto: LockdownDto) {
-    return this.prisma.systemConfig.upsert({
-      where: { id: 'singleton' },
-      update: { botLockdownActive: dto.botLockdownActive },
-      create: {
-        id: 'singleton',
-        botLockdownActive: dto.botLockdownActive,
-        maintenanceMode: false,
-      },
-    });
-  }
-
   async subscribeNewsletter(dto: NewsletterDto) {
     const email = dto.email.toLowerCase().trim();
     const sub = await this.prisma.newsletterSubscriber.upsert({
@@ -455,4 +304,3 @@ export class AdminService {
     return { subscribed: true, email: sub.email };
   }
 }
-

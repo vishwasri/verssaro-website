@@ -483,10 +483,10 @@ export default function AccountOrdersPage() {
           <div className="flex gap-3">
             <Link
               className="flex-1 text-center bg-on-surface text-surface py-3 font-label-caps-sm text-xs uppercase tracking-widest font-bold hover:bg-primary-fixed transition-colors"
-              href="/vault"
+              href="/wishlist"
               onClick={() => setKeysOpen(false)}
             >
-              OPEN NFC VAULT
+              VIEW SAVED ARCHIVE
             </Link>
             <button
               className="bg-surface-container-high px-5 py-3 font-label-caps-sm text-xs uppercase tracking-widest"

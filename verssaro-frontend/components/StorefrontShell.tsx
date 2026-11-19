@@ -10,11 +10,10 @@ import { useStore } from './StoreContext';
 import { VerssaroMark } from './VerssaroMark';
 
 const NAV_LINKS = [
-  { href: '/shop', label: 'SHOP ALL' },
-  { href: '/shop?newDrop=true', label: 'NEW DROPS' },
-  { href: '/shop?capsule=archive', label: 'COLLECTIONS' },
+  { href: '/shop', label: 'COLLECTION' },
   { href: '/editorial', label: 'EDITORIAL' },
-  { href: '/vault', label: 'NFC VAULT' },
+  { href: '/about', label: 'THE ATELIER' },
+  { href: '/account', label: 'PATRON DOSSIER' },
   { href: '/admin', label: 'ATELIER HQ' },
 ];
 
@@ -159,9 +158,9 @@ export function StorefrontShell({ children }: { children: React.ReactNode }) {
             <span className="text-outline-variant">/</span>
             <Link
               className="hover:text-on-surface transition-colors"
-              href="/vault"
+              href="/about"
             >
-              VERIFY NFC CHIP
+              AUTHENTIC HERITAGE
             </Link>
           </div>
         </div>
@@ -408,8 +407,8 @@ export function StorefrontShell({ children }: { children: React.ReactNode }) {
                 </Link>
               </li>
               <li>
-                <Link className="hover:text-on-surface" href="/vault">
-                  NFC Provenance Vault
+                <Link className="hover:text-on-surface" href="/about">
+                  Heritage Atelier
                 </Link>
               </li>
               <li>

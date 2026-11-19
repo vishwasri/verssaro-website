@@ -83,7 +83,7 @@ export default function SignInPage() {
       eyebrow="PATRON ACCESS"
       headingId="signin-heading"
       mode="signin"
-      subtitle="Authenticate with your registered VERSSARO email and passphrase to unlock your order ledger, Polygon wallet telemetry, and NFC provenance vault."
+      subtitle="Authenticate with your registered VERSSARO email and passphrase to access your order history, shipping addresses, and saved archive."
       title="SIGN IN"
     >
       {isAuthenticated && dossier ? (

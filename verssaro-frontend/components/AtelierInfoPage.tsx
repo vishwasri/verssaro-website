@@ -46,9 +46,9 @@ export function AtelierInfoPage({
             </Link>
             <Link
               className="bg-surface-container-low hover:bg-surface-container text-on-surface px-6 py-3.5 font-label-caps-sm text-xs uppercase tracking-widest transition-colors"
-              href="/vault"
+              href="/shop"
             >
-              NFC PROVENANCE VAULT
+              EXPLORE COLLECTION
             </Link>
           </div>
         </header>

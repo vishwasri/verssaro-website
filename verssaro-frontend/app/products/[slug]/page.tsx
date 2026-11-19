@@ -447,10 +447,10 @@ function ProductDetailContent({
               </div>
               <div className="bg-surface-container-low p-3 flex items-center gap-2">
                 <span className="material-symbols-outlined text-base text-primary-fixed">
-                  nfc
+                  verified
                 </span>
                 <span>
-                  {product.nfcEnabled ? 'ENCRYPTED NFC CHIP' : 'ATELIER SEALED'}
+                  ATELIER GIFT BOX SEALED
                 </span>
               </div>
             </div>

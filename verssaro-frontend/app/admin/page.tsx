@@ -7,25 +7,20 @@ import { useStore } from '@/components/StoreContext';
 import { apiFetch } from '@/lib/api';
 
 interface DashboardData {
-  botLockdownActive: boolean;
   kpis: {
-    grossRevenueUsd: number;
-    grossRevenueDelta: string;
-    nfcBindingsCount: number;
-    totalNfcPool: number;
-    pendingSeedingCount: number;
-    p2pVolumeUsd: number;
-    p2pTransfersCount: number;
-    royaltyYieldUsd: number;
-    vaultAssetsUsd: number;
-    hubLoads: Array<{ node: string; capPercent: number }>;
+    grossRevenueUsd?: number;
+    orderCount?: number;
+    enquiryCount?: number;
+    vaultAssetsUsd?: number;
+    productCount?: number;
+    hubLoads?: Array<{ node: string; capPercent: number }>;
   };
-  dropVelocitySeries: Array<{
+  dropVelocitySeries?: Array<{
     day: string;
     primaryMint: number;
     resaleFloor: number;
   }>;
-  recentOrders: Array<{
+  recentOrders?: Array<{
     id: string;
     orderNumber: string;
     customerName: string;
@@ -33,14 +28,11 @@ interface DashboardData {
     totalUsd: number;
     status: string;
   }>;
-  recentTransfers: Array<{
+  recentEnquiries?: Array<{
     id: string;
-    receiptCode: string;
-    fromOwnerName: string;
-    toOwnerName: string;
-    valuationUsd: number;
-    royaltyUsd: number;
-    artifact?: { garmentTitle: string; uid: string } | null;
+    enquiryCode: string;
+    customerName: string;
+    status: string;
   }>;
 }
 
@@ -55,48 +47,47 @@ export default function AdminDashboardPage() {
   }, []);
 
   const handleExportCsv = () => {
-    if (!data) return;
-    const lines = [
-      'TYPE,REF,PARTY,VALUE_USD,STATUS',
-      ...data.recentOrders.map(
-        (o) =>
-          `ORDER,${o.orderNumber},"${o.customerName}",${o.totalUsd},${o.status}`,
-      ),
-      ...data.recentTransfers.map(
-        (t) =>
-          `TRANSFER,${t.receiptCode},"${t.fromOwnerName} -> ${t.toOwnerName}",${t.valuationUsd},CONFIRMED`,
-      ),
+    const rows = [
+      ['Metric', 'Value'],
+      ['Gross Revenue (USD)', data?.kpis?.grossRevenueUsd ?? 0],
+      ['Total Orders', data?.kpis?.orderCount ?? 0],
+      ['Total Enquiries', data?.kpis?.enquiryCount ?? 0],
+      ['Inventory Assets (USD)', data?.kpis?.vaultAssetsUsd ?? 0],
     ];
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'verssaro-atelier-telemetry.csv';
-    a.click();
-    URL.revokeObjectURL(url);
-    announce('EXPORTED ATELIER TELEMETRY CSV');
+    const csvContent =
+      'data:text/csv;charset=utf-8,' + rows.map((e) => e.join(',')).join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `VERSSARO_TELEMETRY_${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    announce('CSV report exported successfully');
   };
 
-  const series = data?.dropVelocitySeries ?? [];
-  const maxVal = Math.max(
-    1,
-    ...series.map((s) => Math.max(s.primaryMint, s.resaleFloor)),
-  );
+  const series = data?.dropVelocitySeries ?? [
+    { day: 'WEEK 1', primaryMint: 25, resaleFloor: 45 },
+    { day: 'WEEK 2', primaryMint: 50, resaleFloor: 45 },
+    { day: 'WEEK 3', primaryMint: 85, resaleFloor: 45 },
+    { day: 'WEEK 4', primaryMint: 120, resaleFloor: 45 },
+  ];
+  const maxVal = Math.max(...series.flatMap((s) => [s.primaryMint, s.resaleFloor]), 1);
 
   return (
     <AdminShell>
       <div className="space-y-8">
-        {/* Header Bar */}
-        <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        {/* Page Header */}
+        <header className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-outline-variant/30">
           <div>
-            <p className="font-data-mono text-[11px] text-primary-fixed uppercase tracking-[0.2em]">
-              ATELIER HQ // COMMAND TELEMETRY
-            </p>
-            <h1 className="font-headline-lg text-2xl md:text-headline-lg uppercase mt-1">
-              OPERATIONAL OVERVIEW
+            <span className="font-label-caps-sm text-[10px] uppercase text-outline">
+              ATELIER HQ COMMAND
+            </span>
+            <h1 className="font-headline-lg text-2xl uppercase mt-1">
+              HERITAGE TELEMETRY &amp; FULFILLMENT
             </h1>
           </div>
-          <div className="flex flex-wrap gap-3">
+          <div className="flex items-center gap-3">
             <button
               className="bg-surface-container-high hover:bg-surface-container-highest px-4 py-2.5 font-label-caps-sm text-[11px] uppercase tracking-widest transition-colors"
               onClick={handleExportCsv}
@@ -105,10 +96,10 @@ export default function AdminDashboardPage() {
               EXPORT CSV REPORT
             </button>
             <Link
-              className="bg-on-surface text-surface hover:bg-primary-fixed px-5 py-2.5 font-label-caps-sm text-[11px] uppercase tracking-widest font-bold transition-colors"
-              href="/admin/promotions"
+              className="bg-[#d9b25c] text-[#0a0a0a] hover:bg-[#f1d38c] px-5 py-2.5 font-label-caps-sm text-[11px] uppercase tracking-widest font-bold transition-colors"
+              href="/admin/catalog"
             >
-              + DEPLOY SECRET DROP
+              + MANAGE PIECES
             </Link>
           </div>
         </header>
@@ -118,104 +109,82 @@ export default function AdminDashboardPage() {
           aria-label="Key Performance Indicators"
           className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4"
         >
-          <div className="bg-surface-container-low p-6 space-y-2">
+          <div className="bg-surface-container-low p-6 space-y-2 border border-[#d9b25c]/10">
             <span className="font-label-caps-sm text-[10px] uppercase text-outline tracking-wider">
-              GROSS REVENUE (MTD)
+              GROSS REVENUE
             </span>
             <p className="font-data-mono text-2xl text-on-surface">
-              {formatPrice(data?.kpis.grossRevenueUsd ?? 482900)}
+              {formatPrice(data?.kpis?.grossRevenueUsd ?? 0)}
             </p>
-            <p className="font-data-mono text-xs text-primary-fixed">
-              {data?.kpis.grossRevenueDelta ?? '+24.4%'} VS PRIOR CYCLE
+            <p className="font-data-mono text-xs text-[#d9b25c]">
+              FROM VERIFIED ORDERS
             </p>
           </div>
 
-          <div className="bg-surface-container-low p-6 space-y-2">
+          <div className="bg-surface-container-low p-6 space-y-2 border border-[#d9b25c]/10">
             <span className="font-label-caps-sm text-[10px] uppercase text-outline tracking-wider">
-              NFC SILICON BINDINGS
+              TOTAL ORDERS
             </span>
             <p className="font-data-mono text-2xl text-on-surface">
-              {data?.kpis.nfcBindingsCount ?? 1420} /{' '}
-              {data?.kpis.totalNfcPool ?? 1500}
+              {data?.kpis?.orderCount ?? 0}
             </p>
             <p className="font-data-mono text-xs text-outline">
-              {data?.kpis.pendingSeedingCount ?? 1} PENDING SEEDING IN VAULT
+              FULFILLED &amp; PROCESSING
             </p>
           </div>
 
-          <div className="bg-surface-container-low p-6 space-y-2">
+          <div className="bg-surface-container-low p-6 space-y-2 border border-[#d9b25c]/10">
             <span className="font-label-caps-sm text-[10px] uppercase text-outline tracking-wider">
-              P2P SECONDARY VOLUME
+              CLIENT ENQUIRIES
             </span>
             <p className="font-data-mono text-2xl text-on-surface">
-              {formatPrice(data?.kpis.p2pVolumeUsd ?? 184200)}
+              {data?.kpis?.enquiryCount ?? 0}
             </p>
-            <p className="font-data-mono text-xs text-primary-fixed">
-              {formatPrice(data?.kpis.royaltyYieldUsd ?? 9210)} (5% ROYALTY
-              YIELD)
+            <p className="font-data-mono text-xs text-[#d9b25c]">
+              NEW INCOMING REQUESTS
             </p>
           </div>
 
-          <div className="bg-surface-container-low p-6 space-y-2">
+          <div className="bg-surface-container-low p-6 space-y-2 border border-[#d9b25c]/10">
             <span className="font-label-caps-sm text-[10px] uppercase text-outline tracking-wider">
-              PHYSICAL VAULT INVENTORY
+              INVENTORY VALUATION
             </span>
             <p className="font-data-mono text-2xl text-on-surface">
-              {formatPrice(data?.kpis.vaultAssetsUsd ?? 0)}
+              {formatPrice(data?.kpis?.vaultAssetsUsd ?? 0)}
             </p>
             <p className="font-data-mono text-xs text-outline">
-              ACROSS CMB // LHR // DXB NODES
+              COLOMBO ATELIER VAULT
             </p>
           </div>
         </section>
 
         {/* Chart + Hub Utilization Row */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* SVG Drop Velocity vs Resale Trajectory Chart */}
           <div className="lg:col-span-8 bg-surface-container-low p-6 space-y-5">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <span className="font-label-caps-sm text-[10px] uppercase text-outline">
-                  MARKET VALUATION TELEMETRY
+                  ORDER &amp; ENQUIRY VELOCITY
                 </span>
                 <h2 className="font-headline-md text-lg uppercase mt-0.5">
-                  DROP VELOCITY VS SECONDARY FLOOR
+                  MONTHLY DROP VELOCITY
                 </h2>
-              </div>
-              <div className="flex items-center gap-4 font-data-mono text-[11px]">
-                <span className="flex items-center gap-1.5 text-on-surface-variant">
-                  <span className="w-2.5 h-2.5 bg-outline inline-block" />
-                  PRIMARY MINT
-                </span>
-                <span className="flex items-center gap-1.5 text-primary-fixed">
-                  <span className="w-2.5 h-2.5 bg-primary-fixed inline-block" />
-                  RESALE FLOOR
-                </span>
               </div>
             </div>
 
             <div className="h-56 bg-surface-container p-4 flex items-end gap-4">
               {series.map((point) => {
                 const mintH = Math.round((point.primaryMint / maxVal) * 140);
-                const resaleH = Math.round((point.resaleFloor / maxVal) * 140);
                 return (
                   <div
-                    className="flex-1 flex flex-col items-center justify-end gap-2 h-full"
                     key={point.day}
+                    className="flex-1 flex flex-col items-center gap-2 h-full justify-end"
                   >
-                    <div className="w-full flex items-end justify-center gap-2 flex-1">
-                      <div
-                        className="w-5 bg-outline transition-all"
-                        style={{ height: `${Math.max(8, mintH)}px` }}
-                        title={`Primary: $${point.primaryMint}`}
-                      />
-                      <div
-                        className="w-5 bg-primary-fixed transition-all"
-                        style={{ height: `${Math.max(8, resaleH)}px` }}
-                        title={`Resale Floor: $${point.resaleFloor}`}
-                      />
-                    </div>
-                    <span className="font-data-mono text-[10px] text-outline text-center">
+                    <div
+                      className="w-full bg-[#d9b25c] transition-all duration-500"
+                      style={{ height: `${Math.max(12, mintH)}px` }}
+                    />
+                    <span className="font-data-mono text-[9px] text-outline text-center">
                       {point.day}
                     </span>
                   </div>
@@ -224,119 +193,68 @@ export default function AdminDashboardPage() {
             </div>
           </div>
 
-          {/* Global Node Capacity Bars */}
-          <div className="lg:col-span-4 bg-surface-container-low p-6 space-y-5">
-            <div>
-              <span className="font-label-caps-sm text-[10px] uppercase text-outline">
-                LOGISTICS UTILIZATION
-              </span>
-              <h2 className="font-headline-md text-lg uppercase mt-0.5">
-                ATELIER HUB CAPACITY LOAD
-              </h2>
-            </div>
-
-            <div className="space-y-4">
-              {(data?.kpis.hubLoads ?? []).map((hub) => (
-                <div className="space-y-1.5" key={hub.node}>
-                  <div className="flex justify-between font-data-mono text-xs">
-                    <span>{hub.node}</span>
-                    <span className="text-primary-fixed">{hub.capPercent}%</span>
-                  </div>
-                  <div className="h-2 bg-surface-container-highest overflow-hidden">
-                    <div
-                      className="h-full bg-on-surface"
-                      style={{ width: `${hub.capPercent}%` }}
-                    />
-                  </div>
+          {/* Hub Load */}
+          <div className="lg:col-span-4 bg-surface-container-low p-6 space-y-4">
+            <span className="font-label-caps-sm text-[10px] uppercase text-outline">
+              FULFILLMENT CAPACITIES
+            </span>
+            <h2 className="font-headline-md text-lg uppercase">ATELIER DISPATCH</h2>
+            <div className="space-y-4 pt-2">
+              <div className="space-y-1">
+                <div className="flex justify-between font-label-caps-sm text-xs">
+                  <span>COLOMBO FLAGSHIP</span>
+                  <span>95%</span>
                 </div>
-              ))}
-            </div>
-
-            <div className="pt-2">
-              <Link
-                className="block text-center bg-surface-container-high hover:bg-on-surface hover:text-surface py-3 font-label-caps-sm text-xs uppercase tracking-widest transition-colors"
-                href="/admin/inventory"
-              >
-                MANAGE INTER-VAULT STOCK →
-              </Link>
+                <div className="h-2 bg-surface-container-highest">
+                  <div className="h-full bg-[#d9b25c] w-[95%]" />
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Bottom 2-Column Live Feeds */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Recent Orders */}
-          <div className="bg-surface-container-low p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="font-headline-md text-base uppercase">
-                RECENT DISPATCH QUEUE
-              </h2>
-              <Link
-                className="font-data-mono text-xs text-primary-fixed hover:underline"
-                href="/admin/orders"
-              >
-                OPEN CONSOLE →
-              </Link>
-            </div>
-            <div className="space-y-2">
-              {(data?.recentOrders ?? []).map((o) => (
-                <div
-                  className="bg-surface-container p-3 flex items-center justify-between gap-4 font-data-mono text-xs"
-                  key={o.id}
-                >
-                  <div>
-                    <p className="text-on-surface font-bold">{o.orderNumber}</p>
-                    <p className="text-outline text-[11px]">
-                      {o.customerName} {'//'} {o.destinationCode}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p>{formatPrice(o.totalUsd)}</p>
-                    <p className="text-[10px] text-primary-fixed">{o.status}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
+        {/* Recent Orders Table */}
+        <section className="bg-surface-container-low p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="font-headline-md text-lg uppercase">
+              RECENT ORDERS &amp; DISPATCHES
+            </h2>
+            <Link
+              href="/admin/orders"
+              className="text-xs uppercase tracking-wider text-[#d9b25c] hover:underline"
+            >
+              VIEW ALL ORDERS →
+            </Link>
           </div>
-
-          {/* Recent Transfers */}
-          <div className="bg-surface-container-low p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="font-headline-md text-base uppercase">
-                RECENT P2P LEDGER EVENTS
-              </h2>
-              <Link
-                className="font-data-mono text-xs text-primary-fixed hover:underline"
-                href="/admin/ledger"
-              >
-                VIEW STREAM →
-              </Link>
-            </div>
-            <div className="space-y-2">
-              {(data?.recentTransfers ?? []).map((t) => (
-                <div
-                  className="bg-surface-container p-3 flex items-center justify-between gap-4 font-data-mono text-xs"
-                  key={t.id}
-                >
-                  <div className="min-w-0">
-                    <p className="text-on-surface font-bold truncate">
-                      {t.artifact?.garmentTitle || t.receiptCode}
-                    </p>
-                    <p className="text-outline text-[11px] truncate">
-                      {t.fromOwnerName} → {t.toOwnerName}
-                    </p>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p>{formatPrice(t.valuationUsd)}</p>
-                    <p className="text-[10px] text-primary-fixed">
-                      +{formatPrice(t.royaltyUsd)} ROYALTY
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs font-mono">
+              <thead>
+                <tr className="border-b border-outline-variant/30 text-outline uppercase">
+                  <th className="py-2">Order #</th>
+                  <th className="py-2">Client</th>
+                  <th className="py-2">Dest</th>
+                  <th className="py-2">Total</th>
+                  <th className="py-2">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-outline-variant/10">
+                {(data?.recentOrders || []).map((o) => (
+                  <tr key={o.id}>
+                    <td className="py-3 text-[#d9b25c]">{o.orderNumber}</td>
+                    <td className="py-3 text-on-surface">{o.customerName}</td>
+                    <td className="py-3 text-outline">{o.destinationCode}</td>
+                    <td className="py-3">{formatPrice(o.totalUsd)}</td>
+                    <td className="py-3">
+                      <span className="px-2 py-0.5 bg-[#d9b25c]/20 text-[#d9b25c] text-[10px] uppercase">
+                        {o.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </div>
+        </section>
       </div>
     </AdminShell>
   );

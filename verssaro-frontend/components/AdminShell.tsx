@@ -11,11 +11,9 @@ const ADMIN_NAV = [
   { href: '/admin', label: 'ATELIER COMMAND', icon: 'dashboard' },
   { href: '/admin/catalog', label: 'CATALOG MATRIX', icon: 'grid_view' },
   { href: '/admin/orders', label: 'ORDERS & DISPATCH', icon: 'local_shipping' },
-  { href: '/admin/nfc', label: 'NFC SILICON VAULT', icon: 'nfc' },
-  { href: '/admin/inventory', label: 'MULTI-VAULT STOCK', icon: 'warehouse' },
-  { href: '/admin/ledger', label: 'PROVENANCE LEDGER', icon: 'token' },
-  { href: '/admin/clients', label: 'VIP DOSSIERS', icon: 'badge' },
-  { href: '/admin/promotions', label: 'VIP ACCESS ENGINE', icon: 'vpn_key' },
+  { href: '/admin/inventory', label: 'INVENTORY STOCK', icon: 'warehouse' },
+  { href: '/admin/clients', label: 'PATRON CLIENTS', icon: 'badge' },
+  { href: '/admin/promotions', label: 'PROMOTIONS & PRIVILEGES', icon: 'vpn_key' },
 ];
 
 export function AdminShell({ children }: { children: React.ReactNode }) {

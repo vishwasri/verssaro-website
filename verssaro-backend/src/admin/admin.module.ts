@@ -13,9 +13,7 @@ import {
   AdminService,
   CreatePromoDto,
   CreateVipClientDto,
-  LockdownDto,
   NewsletterDto,
-  TransferVaultStockDto,
   UpdatePromoStatusDto,
   UpdateVipClientDto,
 } from './admin.service';
@@ -33,11 +31,6 @@ export class AdminController {
   @Get('inventory')
   getInventory() {
     return this.adminService.getInventoryMatrix();
-  }
-
-  @Post('inventory/transfer')
-  transferStock(@Body() dto: TransferVaultStockDto) {
-    return this.adminService.transferVaultStock(dto);
   }
 
   @Get('clients')
@@ -72,11 +65,6 @@ export class AdminController {
   ) {
     return this.adminService.updatePromotionStatus(id, dto);
   }
-
-  @Post('system/lockdown')
-  setLockdown(@Body() dto: LockdownDto) {
-    return this.adminService.setLockdown(dto);
-  }
 }
 
 @ApiTags('newsletter')
@@ -96,4 +84,3 @@ export class NewsletterController {
   exports: [AdminService],
 })
 export class AdminModule {}
-

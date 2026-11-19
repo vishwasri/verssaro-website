@@ -3,9 +3,7 @@ import { Product } from '@prisma/client';
 export interface ProductSizeStock {
   size: string;
   stock: number;
-  colombo: number;
-  london: number;
-  dubai: number;
+  colombo?: number;
 }
 
 export interface SerializedProduct {
@@ -47,9 +45,6 @@ export interface SerializedProduct {
     shoulder: string;
     sleeve: string;
   }[];
-  nfcEnabled: boolean;
-  siliconLocation: string;
-  smartPerk: string;
 }
 
 function safeParseJson<T>(raw: string, fallback: T): T {
@@ -101,9 +96,6 @@ export function serializeProduct(p: Product): SerializedProduct {
     totalStock,
     images: safeParseJson<string[]>(p.imagesJson, []),
     measurements: safeParseJson(p.measurementsJson, []),
-    nfcEnabled: p.nfcEnabled,
-    siliconLocation: p.siliconLocation,
-    smartPerk: p.smartPerk,
   };
 }
 
@@ -111,4 +103,3 @@ export function resolveSessionId(sessionHeader?: string): string {
   const cleaned = sessionHeader?.trim();
   return cleaned && cleaned.length >= 3 ? cleaned : 'demo-session-aw';
 }
-

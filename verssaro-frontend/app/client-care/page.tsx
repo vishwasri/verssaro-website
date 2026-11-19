@@ -41,8 +41,8 @@ export default function ClientCarePage() {
           ],
         },
       ]}
-      ctaHref="/vault"
-      ctaLabel="OPEN NFC VAULT CARE PASS"
+      ctaHref="/account"
+      ctaLabel="VIEW PATRON DOSSIER"
       eyebrow="CLIENT CARE // LOGISTICS & RESTORATION"
       lead="White-glove courier telemetry, customs clearance, returns protocol, and lifetime restoration servicing for VERSSARO patrons."
       title="CARE, DISPATCH & RETURNS."

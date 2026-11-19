@@ -191,7 +191,7 @@ export default function ShippingDossierPage() {
               + REGISTER NEW DESTINATION
             </button>
           }
-          subtitle="Manage international courier destinations, armored private vault handovers, and custom packaging specifications."
+          subtitle="Manage international courier destinations, residential delivery addresses, and gift specifications."
           title="SHIPPING DOSSIERS // ADDRESS BOOK"
         />
 

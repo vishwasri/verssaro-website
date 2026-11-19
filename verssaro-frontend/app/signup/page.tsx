@@ -80,7 +80,7 @@ export default function SignUpPage() {
       eyebrow="PATRON ENROLMENT"
       headingId="signup-heading"
       mode="signup"
-      subtitle="Initialize a sovereign VERSSARO dossier with a bound Polygon custody wallet, Colombo concierge routing, and USD $100 archival credit."
+      subtitle="Initialize your VERSSARO client profile with private patron privileges, bespoke concierge service, and order tracking."
       title="CREATE ACCOUNT"
     >
       <form

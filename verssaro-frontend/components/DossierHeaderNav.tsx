@@ -27,15 +27,9 @@ const DOSSIER_TABS: Array<{
     icon: 'bookmark',
   },
   {
-    key: 'vault',
-    href: '/vault',
-    label: 'NFC PROVENANCE VAULT',
-    icon: 'nfc',
-  },
-  {
     key: 'addresses',
     href: '/account/addresses',
-    label: 'SHIPPING DOSSIERS',
+    label: 'SHIPPING ADDRESSES',
     icon: 'location_on',
   },
 ];

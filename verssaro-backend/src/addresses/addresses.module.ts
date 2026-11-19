@@ -118,8 +118,7 @@ export class AddressesService {
         carrierPreference:
           dto.carrierPreference?.trim() || 'DHL EXPRESS PRIORITY DDP',
         deliveryInstructions: dto.deliveryInstructions?.trim() || null,
-        packagingSpec: dto.packagingSpec || 'ARCHIVAL_MONOLITH_BOX',
-        coordinates: '6.9271° N, 79.8612° E',
+        packagingSpec: dto.packagingSpec || 'BESPOKE_GIFT_BOX',
       },
     });
   }

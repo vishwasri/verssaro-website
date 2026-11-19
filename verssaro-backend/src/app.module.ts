@@ -6,7 +6,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { CartModule } from './cart/cart.module';
-import { NfcModule } from './nfc/nfc.module';
+import { EnquiriesModule } from './enquiries/enquiries.module';
 import { OrdersModule } from './orders/orders.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ProductsModule } from './products/products.module';
@@ -22,7 +22,7 @@ import { WishlistModule } from './wishlist/wishlist.module';
     WishlistModule,
     OrdersModule,
     AddressesModule,
-    NfcModule,
+    EnquiriesModule,
     AdminModule,
   ],
   controllers: [AppController],

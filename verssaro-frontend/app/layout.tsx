@@ -1,24 +1,21 @@
 import type { Metadata } from 'next';
-import { Inter, Syne } from 'next/font/google';
 import './globals.css';
+import './verssaro.css';
 import { StoreProvider } from '@/components/StoreContext';
-
-const syne = Syne({
-  subsets: ['latin'],
-  weight: ['700', '800'],
-  variable: '--font-syne',
-});
-
-const inter = Inter({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
-  variable: '--font-inter',
-});
+import { CustomCursor } from '@/components/CustomCursor';
 
 export const metadata: Metadata = {
-  title: 'VERSSARO — Luxury Streetwear Atelier & NFC Provenance Vault',
+  title: 'VERSSARO — Sri Lankan Heritage. Modern Expression.',
   description:
-    'Architectural heavyweight luxury streetwear crafted in Colombo with embedded NFC silicon provenance. Shop Archive 01, Shadow Weave, and verify collectibles.',
+    'VERSSARO is a Sri Lankan heritage apparel house reimagining island legends, guardians and cultural icons as contemporary graphic tees.',
+  icons: {
+    icon: '/assets/brand/favicon.svg',
+  },
+  openGraph: {
+    title: 'VERSSARO — Sri Lankan Heritage. Modern Expression.',
+    description: 'Heritage graphic tees. Guardians, dancers and island legends, worn bold.',
+    images: ['/assets/img/og-cover.jpg'],
+  },
 };
 
 export default function RootLayout({
@@ -27,23 +24,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${syne.variable} ${inter.variable} dark h-full antialiased`}
-    >
-      <head>
-        <link
-          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
-          rel="stylesheet"
-        />
-      </head>
-      <body className="min-h-full bg-surface text-on-surface flex flex-col selection:bg-on-surface selection:text-surface">
-        <a
-          className="visually-hidden focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[100] focus:bg-on-surface focus:text-surface focus:px-4 focus:py-2 focus:font-label-caps-lg focus:uppercase"
-          href="#main-content"
-        >
-          Skip to main content
-        </a>
+    <html lang="en" className="dark h-full antialiased">
+      <body className="min-h-full bg-[#0a0a0a] text-[#f3ecde] flex flex-col selection:bg-[#d9b25c] selection:text-[#0a0a0a]">
+        <div className="grain" aria-hidden="true" />
+        <CustomCursor />
         <StoreProvider>{children}</StoreProvider>
       </body>
     </html>

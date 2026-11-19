@@ -31,7 +31,7 @@ export class AuthService {
         });
         if (found) return found;
       } catch {
-        // fallback to demo patron dossier
+        // fallback to demo patron
       }
     }
 
@@ -41,18 +41,18 @@ export class AuthService {
       })) ?? (await this.prisma.user.findFirst());
 
     if (!demoUser) {
-      throw new NotFoundException('No client dossier found');
+      throw new NotFoundException('No client record found');
     }
     return demoUser;
   }
 
   async getDossierSummary(authHeader?: string) {
     const user = await this.resolveUserFromTokenOrDefault(authHeader);
-    const [orderCount, wishlistCount, nfcCount, addressCount] =
+    const [orderCount, wishlistCount, enquiryCount, addressCount] =
       await Promise.all([
         this.prisma.order.count({ where: { userId: user.id } }),
         this.prisma.wishlistItem.count({ where: { userId: user.id } }),
-        this.prisma.nfcArtifact.count({ where: { ownerUserId: user.id } }),
+        this.prisma.enquiry.count({ where: { userId: user.id } }),
         this.prisma.address.count({ where: { userId: user.id } }),
       ]);
 
@@ -61,7 +61,7 @@ export class AuthService {
       counts: {
         orders: orderCount,
         wishlist: wishlistCount,
-        nfcArtifacts: nfcCount,
+        enquiries: enquiryCount,
         addresses: addressCount,
       },
     };
@@ -97,11 +97,6 @@ export class AuthService {
     }
     const passwordHash = await bcrypt.hash(dto.password, 10);
     const suffix = Math.floor(1000 + Math.random() * 8999);
-    const walletHex = Array.from({ length: 20 }, () =>
-      Math.floor(Math.random() * 256)
-        .toString(16)
-        .padStart(2, '0'),
-    ).join('');
 
     const user = await this.prisma.user.create({
       data: {
@@ -111,11 +106,9 @@ export class AuthService {
         phone: dto.phone?.trim() ?? null,
         role: 'CLIENT',
         dossierCode: `DOSSIER // ${suffix}-VR`,
-        tier: 'TIER 02 // SOVEREIGN VERIFIED',
-        walletAddress: `0x${walletHex.slice(0, 4)}...${walletHex.slice(-4)}`,
-        walletFull: `0x${walletHex}`,
+        tier: 'HERITAGE PATRON',
         atelierHub: 'COLOMBO FLAGSHIP',
-        storeCreditUsd: 100,
+        storeCreditUsd: 0,
       },
     });
 
@@ -146,4 +139,3 @@ export class AuthService {
     return { user: this.sanitizeUser(updated) };
   }
 }
-

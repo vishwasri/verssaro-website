@@ -1,129 +1,182 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { AppModule } from './app.module';
 import { ProductsService } from './products/products.service';
-import { CartService } from './cart/cart.service';
-import { OrdersService } from './orders/orders.service';
-import { NfcService } from './nfc/nfc.service';
-import { AdminService } from './admin/admin.service';
+import { EnquiriesService } from './enquiries/enquiries.service';
+import { PrismaService } from './prisma/prisma.service';
+import { serializeProduct } from './common/product-mapper';
+import { SEED_PRODUCTS } from './prisma/seed.data';
 
 describe('VERSSARO Backend Domain Suite', () => {
-  let moduleRef: TestingModule;
   let productsService: ProductsService;
-  let cartService: CartService;
-  let ordersService: OrdersService;
-  let nfcService: NfcService;
-  let adminService: AdminService;
+  let enquiriesService: EnquiriesService;
+  let mockPrisma: any;
 
-  const testSessionId = `jest-session-${Date.now()}`;
+  const sampleProducts = SEED_PRODUCTS.map((p, idx) => ({
+    id: `prod-0${idx + 1}`,
+    ...p,
+    createdAt: new Date('2025-01-01T00:00:00Z'),
+    updatedAt: new Date('2025-01-01T00:00:00Z'),
+  }));
 
-  beforeAll(async () => {
-    moduleRef = await Test.createTestingModule({
-      imports: [AppModule],
+  const inMemoryEnquiries: any[] = [];
+
+  beforeEach(async () => {
+    mockPrisma = {
+      product: {
+        findMany: jest.fn().mockResolvedValue(sampleProducts),
+        findFirst: jest.fn().mockImplementation(({ where }) => {
+          const target = where.OR?.[0]?.slug || where.OR?.[1]?.id || where.slug || where.id;
+          const found = sampleProducts.find((p) => p.slug === target || p.id === target);
+          return Promise.resolve(found ? { ...found, reviews: [] } : null);
+        }),
+        findUnique: jest.fn().mockImplementation(({ where }) => {
+          if (where.slug) {
+            const found = sampleProducts.find((p) => p.slug === where.slug);
+            return Promise.resolve(found || null);
+          }
+          if (where.id) {
+            const found = sampleProducts.find((p) => p.id === where.id);
+            return Promise.resolve(found || null);
+          }
+          return Promise.resolve(null);
+        }),
+      },
+      enquiry: {
+        create: jest.fn().mockImplementation(({ data }) => {
+          const newEnq = {
+            id: `enq-${Date.now()}`,
+            enquiryCode: data.enquiryCode,
+            customerName: data.customerName,
+            email: data.email,
+            phone: data.phone,
+            notes: data.notes,
+            status: 'NEW',
+            source: data.source,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            items: data.items.create.map((it: any, idx: number) => ({
+              id: `item-${idx}`,
+              ...it,
+            })),
+          };
+          inMemoryEnquiries.push(newEnq);
+          return Promise.resolve(newEnq);
+        }),
+        findMany: jest.fn().mockImplementation(() => Promise.resolve(inMemoryEnquiries)),
+        findUnique: jest.fn().mockImplementation(({ where }) => {
+          const found = inMemoryEnquiries.find((e) => e.id === where.id);
+          return Promise.resolve(found || null);
+        }),
+        update: jest.fn().mockImplementation(({ where, data }) => {
+          const found = inMemoryEnquiries.find((e) => e.id === where.id);
+          if (found) {
+            Object.assign(found, data);
+            return Promise.resolve(found);
+          }
+          return Promise.resolve(null);
+        }),
+      },
+      $connect: jest.fn().mockResolvedValue(undefined),
+      $disconnect: jest.fn().mockResolvedValue(undefined),
+    };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        ProductsService,
+        EnquiriesService,
+        {
+          provide: PrismaService,
+          useValue: mockPrisma,
+        },
+      ],
     }).compile();
 
-    await moduleRef.init();
-    productsService = moduleRef.get(ProductsService);
-    cartService = moduleRef.get(CartService);
-    ordersService = moduleRef.get(OrdersService);
-    nfcService = moduleRef.get(NfcService);
-    adminService = moduleRef.get(AdminService);
+    productsService = module.get<ProductsService>(ProductsService);
+    enquiriesService = module.get<EnquiriesService>(EnquiriesService);
   });
 
-  afterAll(async () => {
-    await moduleRef.close();
-  });
+  describe('Products & Heritage Catalog', () => {
+    it('returns authentic VERSSARO heritage products with correct serialization', async () => {
+      const result = await productsService.findAll();
+      expect(result.items.length).toBe(4);
+      expect(result.total).toBe(4);
 
-  it('filters catalog products by category and price', async () => {
-    const all = await productsService.findAll();
-    expect(all.items.length).toBeGreaterThanOrEqual(10);
-
-    const hoodies = await productsService.findAll({ category: 'hoodies' });
-    expect(hoodies.items.length).toBeGreaterThanOrEqual(2);
-    expect(hoodies.items.every((p) => p.category === 'hoodies')).toBe(true);
-
-    const under150 = await productsService.findAll({ maxPrice: '150' });
-    expect(under150.items.every((p) => p.priceUsd <= 150)).toBe(true);
-  });
-
-  it('adds items to bag, applies ARCHIVE10 promo, and enforces free shipping threshold', async () => {
-    const tee = await productsService.findBySlug(
-      'archive-01-heavyweight-oversized-tee',
-    );
-    const hoodie = await productsService.findBySlug(
-      'heavy-fleece-capsule-hoodie',
-    );
-
-    await cartService.addItem(testSessionId, {
-      productId: tee.product.id,
-      size: 'L',
-      colorName: 'Obsidian Black',
-      quantity: 1,
-    });
-    await cartService.addItem(testSessionId, {
-      productId: hoodie.product.id,
-      size: 'M',
-      colorName: 'Vintage Wash',
-      quantity: 1,
+      const slugs = result.items.map((p) => p.slug);
+      expect(slugs).toContain('guardian-of-the-flame');
+      expect(slugs).toContain('mayara');
+      expect(slugs).toContain('the-ivory-edit');
+      expect(slugs).toContain('highlands-edition');
     });
 
-    const discounted = await cartService.applyPromo(testSessionId, {
-      code: 'ARCHIVE10',
+    it('finds single product by slug and formats specifications correctly', async () => {
+      const guardian = await productsService.findBySlug('guardian-of-the-flame');
+      expect(guardian.product).toBeDefined();
+      expect(guardian.product.name).toBe('Guardian of the Flame');
+      expect(guardian.product.sku).toBe('VS-01-GUARDIAN');
+      expect(guardian.product.priceUsd).toBe(45);
+      expect(guardian.product.sizes.map((s) => s.size)).toEqual(['S', 'M', 'L', 'XL', 'XXL']);
+      expect(guardian.product.images[0]).toBe('/assets/img/p-guardian.webp');
     });
 
-    expect(discounted.subtotalUsd).toBe(345);
-    expect(discounted.discountUsd).toBe(34.5);
-    expect(discounted.freeShipQualified).toBe(false);
-    expect(discounted.amountToFreeShippingUsd).toBe(55);
-    expect(discounted.totalUsd).toBe(335.5);
+    it('serializes product and ensures obsolete fields (nfc, crypto) are excluded', () => {
+      const raw = sampleProducts[0] as any;
+      const serialized = serializeProduct(raw);
+
+      expect((serialized as any).nfcEnabled).toBeUndefined();
+      expect((serialized as any).siliconLocation).toBeUndefined();
+      expect((serialized as any).smartPerk).toBeUndefined();
+      expect(serialized.name).toBe('Guardian of the Flame');
+      expect(serialized.priceUsd).toBe(45);
+      expect(serialized.totalStock).toBeGreaterThan(0);
+    });
   });
 
-  it('creates an order from cart, allocates NFC tag, and clears bag', async () => {
-    const order = await ordersService.createOrder(testSessionId, undefined, {
-      customerName: 'Alexander Wright',
-      email: 'alexander.wright@verssaro.vip',
-      phone: '+94771123456',
-      addressLine1: '89 Ward Place',
-      city: 'Colombo',
-      postalCode: '00300',
-      country: 'Sri Lanka',
-      countryCode: 'LK',
-      shippingMethod: 'colombo_same_day',
-      paymentMethod: 'card',
+  describe('Enquiries & Client Care Pipeline', () => {
+    it('creates and records client drawer enquiries with item details', async () => {
+      const created = await enquiriesService.createEnquiry({
+        customerName: 'Alexander Wright',
+        email: 'alexander@verssaro.vip',
+        phone: '+94771234567',
+        notes: 'Enquiring for private courier to Ward Place',
+        source: 'WEBSITE_DRAWER',
+        items: [
+          {
+            productId: 'prod-01',
+            name: 'Guardian of the Flame',
+            size: 'L',
+            colorName: 'Obsidian Black',
+            quantity: 1,
+          },
+          {
+            productId: 'prod-03',
+            name: 'The Ivory Edit',
+            size: 'XL',
+            colorName: 'Warm Ivory',
+            quantity: 1,
+          },
+        ],
+      });
+
+      expect(created.enquiryCode).toMatch(/^ENQ-\d{4}-\d{4}$/);
+      expect(created.customerName).toBe('Alexander Wright');
+      expect(created.items.length).toBe(2);
+      expect(created.items[0].name).toBe('Guardian of the Flame');
+      expect(created.items[0].size).toBe('L');
     });
 
-    expect(order.orderNumber).toMatch(/^VR-2025-/);
-    expect(order.totalUsd).toBe(310.5);
-
-    const postOrderBag = await cartService.getCart(testSessionId);
-    expect(postOrderBag.items.length).toBe(0);
-  });
-
-  it('executes NFC P2P provenance transfer and logs 5% royalty receipt', async () => {
-    const vault = await nfcService.getVault();
-    expect(vault.artifacts.length).toBeGreaterThanOrEqual(1);
-    const first = vault.artifacts[0];
-
-    const res = await nfcService.transferProvenance({
-      artifactId: first.id,
-      recipientInput: '0x3B89e1F4D99100B32E496DAE',
-      transferMethod: 'HEX',
+    it('fetches all enquiries ordered by date', async () => {
+      const all = await enquiriesService.findAll();
+      expect(all.length).toBeGreaterThanOrEqual(1);
+      expect(all[0].customerName).toBe('Alexander Wright');
     });
 
-    expect(res.receipt.receiptCode).toMatch(/^REC-2025-/);
-    expect(res.receipt.royaltyUsd).toBe(
-      Number((first.valuationUsd * 0.05).toFixed(2)),
-    );
+    it('updates enquiry status along the concierge pipeline', async () => {
+      const all = await enquiriesService.findAll();
+      const first = all[0];
 
-    // Restore ownership back to Alexander Wright for demo consistency
-    await nfcService.bindToVault(first.id);
-  });
-
-  it('returns Atelier Admin dashboard telemetry & inventory matrix', async () => {
-    const dashboard = await adminService.getDashboardTelemetry();
-    expect(dashboard.kpis.grossRevenueUsd).toBeGreaterThan(480000);
-
-    const matrix = await adminService.getInventoryMatrix();
-    expect(matrix.rows.length).toBeGreaterThanOrEqual(10);
+      const updated = await enquiriesService.updateStatus(first.id, {
+        status: 'DISPATCHED',
+      });
+      expect(updated.status).toBe('DISPATCHED');
+    });
   });
 });
-

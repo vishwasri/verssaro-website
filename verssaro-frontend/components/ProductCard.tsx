@@ -175,7 +175,7 @@ export function ProductCard({ product, compact = false }: ProductCardProps) {
             {formatPrice(product.priceUsd)}
           </span>
           <span className="font-data-mono text-[10px] text-outline uppercase">
-            {product.nfcEnabled ? 'NFC VERIFIED' : 'ESSENTIAL'}
+            {product.editionLabel || 'HERITAGE / 280 GSM'}
           </span>
         </div>
       </div>

@@ -240,6 +240,28 @@ export interface NfcArtifact {
   lastVerifiedAt: string;
 }
 
+export interface EnquiryItem {
+  id?: string;
+  productId?: string;
+  name: string;
+  size: string;
+  colorName?: string;
+  quantity: number;
+}
+
+export interface Enquiry {
+  id?: string;
+  enquiryCode?: string;
+  customerName: string;
+  email?: string;
+  phone?: string;
+  notes?: string;
+  source?: string;
+  status?: string;
+  items: EnquiryItem[];
+  createdAt?: string;
+}
+
 export interface VaultTransferReceipt {
   id: string;
   receiptCode: string;

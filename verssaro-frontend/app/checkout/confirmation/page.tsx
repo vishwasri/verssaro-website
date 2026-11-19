@@ -253,9 +253,9 @@ function ConfirmationContent() {
           <div className="flex flex-wrap gap-3 pt-2">
             <Link
               className="bg-on-surface text-surface px-8 py-4 font-label-caps-lg uppercase font-bold"
-              href="/vault"
+              href="/account"
             >
-              INSPECT NFC PROVENANCE VAULT
+              VIEW ORDER HISTORY
             </Link>
             <button
               className="bg-surface-container-highest text-on-surface px-6 py-4 font-label-caps-lg uppercase"

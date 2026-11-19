@@ -113,15 +113,13 @@ export class OrdersService {
           size: string;
           stock: number;
           colombo: number;
-          london: number;
-          dubai: number;
         }[];
         const nextSizes = sizes.map((s) =>
           s.size.toUpperCase() === item.size.toUpperCase()
             ? {
                 ...s,
                 stock: Math.max(0, s.stock - item.quantity),
-                colombo: Math.max(0, s.colombo - item.quantity),
+                colombo: Math.max(0, (s.colombo ?? s.stock) - item.quantity),
               }
             : s,
         );
@@ -129,56 +127,6 @@ export class OrdersService {
           where: { id: product.id },
           data: { sizesJson: JSON.stringify(nextSizes) },
         });
-
-        await this.prisma.stockMovement.create({
-          data: {
-            productId: product.id,
-            sku: product.sku,
-            garmentTitle: product.name,
-            fromNode: 'Colombo Flagship',
-            toNode: `${dto.city.trim()} // ${orderNumber}`,
-            quantity: item.quantity,
-            movementType: 'DISPATCH',
-            initiatedBy: 'CHECKOUT PIPELINE',
-            referenceCode: orderNumber,
-            status: 'COMPLETED',
-          },
-        });
-
-        if (product.nfcEnabled) {
-          const hex = () =>
-            Math.floor(16 + Math.random() * 239)
-              .toString(16)
-              .toUpperCase();
-          const uid = `04:${hex()}:${hex()}:${hex()}:${hex()}:${hex()}:80`;
-          const randTag = Math.floor(1000 + Math.random() * 8999);
-          await this.prisma.nfcArtifact.create({
-            data: {
-              uid,
-              tagLabel: `NFC-9941-${randTag}`,
-              keccakHash: `0x${Array.from({ length: 40 }, () =>
-                Math.floor(Math.random() * 16).toString(16),
-              ).join('')}`,
-              tokenId: `#${randTag}-SOV`,
-              productId: product.id,
-              orderId: created.id,
-              ownerUserId: user.id,
-              garmentTitle: product.name,
-              sku: product.sku,
-              colorway: item.colorName,
-              size: item.size,
-              acquiredLabel: 'NOV 2025',
-              valuationUsd: product.priceUsd,
-              editionRun: product.editionLabel,
-              textileSpec: product.material,
-              siliconLocation: product.siliconLocation,
-              smartPerk: product.smartPerk,
-              warehouseNode: 'Client Custody',
-              status: 'ACTIVE_BOUND',
-              imageUrl: item.imageUrl,
-            },
-          });
-        }
       }
     }
 
@@ -209,7 +157,7 @@ export class OrdersService {
   async getByOrderNumber(orderNumber: string) {
     const order = await this.prisma.order.findFirst({
       where: { OR: [{ orderNumber }, { id: orderNumber }] },
-      include: { items: true, nfcArtifacts: true },
+      include: { items: true },
     });
     if (!order) {
       throw new NotFoundException(`Order "${orderNumber}" not found`);
@@ -221,7 +169,7 @@ export class OrdersService {
     const user = await this.authService.resolveUserFromTokenOrDefault(authHeader);
     const orders = await this.prisma.order.findMany({
       where: { userId: user.id },
-      include: { items: true, nfcArtifacts: true },
+      include: { items: true },
       orderBy: { createdAt: 'desc' },
     });
     return {
@@ -301,4 +249,3 @@ export class OrdersService {
     return { dispatchedCount: res.count };
   }
 }
-
